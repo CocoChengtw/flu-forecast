@@ -1,0 +1,13 @@
+pandas
+numpy
+matplotlib
+plotly
+statsmodels
+statsforecast
+prophet
+anthropic          # 或 openai，看你們用哪個 LLM
+python-dotenv
+streamlit
+requests
+jupyter
+nbstripout
