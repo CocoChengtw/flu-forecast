@@ -1,0 +1,31 @@
+{
+  "chart": {
+    "title": "Weekly share of influenza tests that were positive",
+    "subtitle": "People who were tested had a respiratory infection with a fever, cough and onset within the last 10 days. Only a fraction of potential cases of influenza are tested by labs to confirm whether they have influenza and to identify their strain. The level of testing may vary between countries and over time.",
+    "note": "The share of positive tests is calculated by dividing the number of tests that were positive to any flu strain by three possible denominators, based on data availability. If both values are available then the denominator is the sum of positive and negative tests; if not then the number specimens processed is used; if neither of those are available then the number of specimens received by the testing facility is used.",
+    "citation": "World Health Organization (2023)",
+    "originalChartUrl": "https://ourworldindata.org/explorers/influenza?Confirmed+cases+or+Symptoms=Confirmed+cases&Metric=Share+of+positive+tests+%28%25%29&Interval=Weekly&Surveillance+type=All+types&country=OWID_NH~OWID_SH",
+    "selection": [
+      "Northern Hemisphere",
+      "Southern Hemisphere"
+    ]
+  },
+  "columns": {
+    "pcnt_poscombined": {
+      "titleShort": "Share of positive tests - All types of surveillance",
+      "titleLong": "Share of positive tests - All types of surveillance",
+      "shortUnit": "%",
+      "unit": "%",
+      "timespan": "",
+      "type": "Percentage",
+      "owidVariableId": 1025147,
+      "shortName": "pcnt_poscombined",
+      "lastUpdated": "2026-10-17",
+      "citationShort": "World Health Organization (2023) – processed by Our World in Data",
+      "citationLong": "World Health Organization (2023) – processed by Our World in Data. “Share of positive tests - All types of surveillance” [dataset]. World Health Organization, “FluNet” [original data].",
+      "fullMetadata": "https://api.ourworldindata.org/v1/indicators/1025147.metadata.json"
+    }
+  },
+  "dateDownloaded": "2026-10-17",
+  "activeFilters": {}
+}
