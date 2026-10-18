@@ -1,0 +1,83 @@
+"""
+Shared project settings. Every script imports from here so the whole team
+uses the same definitions:
+
+    from src.config import TEST_START, TEST_END, N_PATHS
+
+Dates are the Sunday that starts each CDC MMWR week (the week convention used
+by ILINet and in data/processed/ili_plus_weekly.csv). "Week 40" means MMWR week 40.
+"""
+
+# ---------------------------------------------------------------------------
+# Data
+# ---------------------------------------------------------------------------
+
+# Geography to forecast. "nat" = United States. "hhs9" (HHS Region 9, incl.
+# California) is also in the data file but is a stretch goal.
+REGION = "nat"
+
+# First week of the 2015-16 season (MMWR 2015 week 40). Clinical-lab flu
+# positivity, which ILI+ needs, starts here, so we can't go earlier.
+TRAIN_START = "2015-10-04"
+
+# ---------------------------------------------------------------------------
+# Train / test split
+# ---------------------------------------------------------------------------
+# CDC's surveillance year runs from MMWR week 40 to week 39 of the next year.
+# Flu activity is concentrated in weeks 40-20, so like other flu forecasting
+# work we use weeks 40-20 of the most recent complete season (2025-26) as the
+# test period. Every week in it is used as a forecast origin. Only data up to
+# the origin is given to the model.
+
+# MMWR 2025 week 40: first week of the 2025-26 season.
+TEST_START = "2025-09-28"
+
+# MMWR 2026 week 20: last week of the 2025-26 season. With a 4-week horizon,
+# the last forecasts target 2026 week 24, which is already observed.
+TEST_END = "2026-05-17"
+
+# ---------------------------------------------------------------------------
+# COVID-19 disruption
+# ---------------------------------------------------------------------------
+# Distancing and masking almost eliminated flu during the 2020-21 season.
+# Left as is, this flat year distorts the seasonality models learn. We replace
+# ILI+ in this window with the same-week mean of non-COVID seasons and keep an
+# `is_imputed` flag. The window covers the full 2020-21 surveillance year:
+# from MMWR 2020 week 27 (after the cut-short 2019-20 season) through
+# MMWR 2021 week 39 (just before the 2021-22 season starts). The 2021-22 season
+# is kept as observed: it was irregular, but it really happened.
+
+COVID_START = "2020-06-28"   # MMWR 2020 week 27
+COVID_END = "2021-09-26"     # MMWR 2021 week 39
+
+# ---------------------------------------------------------------------------
+# Threshold (season onset)
+# ---------------------------------------------------------------------------
+# Adapted from CDC's ILINet baseline: the mean % of ILI visits during
+# non-influenza weeks of the 3 most recent seasons, plus 2 SD. CDC defines
+# non-influenza weeks with public-health-lab positive counts, which our data
+# doesn't include, so we simplify: off-season = MMWR weeks 21-39 (June to
+# September), when flu activity is minimal. Computed by A from the raw
+# (non-imputed) ILI+, using the last 3 non-COVID seasons.
+
+OFFSEASON_WEEKS = range(21, 40)   # MMWR weeks 21..39 inclusive
+THRESHOLD_N_SEASONS = 3
+THRESHOLD_N_SD = 2
+THRESHOLD = None   # ILI+ value; A fills this in once computed
+
+# Onset week = first of this many consecutive weeks above THRESHOLD.
+ONSET_CONSECUTIVE_WEEKS = 2
+
+# ---------------------------------------------------------------------------
+# Forecasting
+# ---------------------------------------------------------------------------
+
+# Forecast 1-4 weeks ahead: far enough to plan staffing, short enough to be useful.
+HORIZONS = [1, 2, 3, 4]
+
+# Simulated paths per origin. Probabilities (threshold crossing, onset, peak)
+# are computed from these. 500 keeps them stable to about +/-2 percentage points.
+N_PATHS = 500
+
+# Fixed seed so every run produces the same paths.
+RANDOM_SEED = 437
