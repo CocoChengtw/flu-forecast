@@ -1,0 +1,120 @@
+{
+  "region": "nat",
+  "source_sha256": "dfd55115097cf85b53cddeaf4f073f1dcb25dcafa0b1a9496926bbdfe1fe8076",
+  "first_week": "2016-10-02",
+  "last_week": "2026-10-04",
+  "observations": 523,
+  "duplicate_weeks": 0,
+  "missing_weeks": 0,
+  "formula_verified": true,
+  "configured_train_start": "2015-10-04",
+  "actual_train_start": "2016-10-02",
+  "required_last_test_target": "2026-06-14",
+  "threshold": 0.02821210456715307,
+  "threshold_offseason_years": [
+    2023,
+    2024,
+    2025
+  ],
+  "threshold_n": 57,
+  "mean": 0.013459370553024562,
+  "sample_sd": 0.007376367007064253,
+  "method": "Pooled raw weeks 21-39, latest 3 complete non-COVID offseasons strictly before TEST_START; sample SD (ddof=1).",
+  "caveats": [
+    "Research threshold, not official CDC ILI+ baseline.",
+    "Fixed threshold applied to older seasons is descriptive, not historical real-time calibration.",
+    "Some historical onsets are in October; do not tune to force November-December.",
+    "Season-start exceedance can be left-censored; incomplete-season peaks are provisional.",
+    "Downloaded historical values may be revised; this is not an as-of-vintage audit."
+  ],
+  "historical_events": [
+    {
+      "season": "2016-2017",
+      "complete": true,
+      "onset": "2016-10-30",
+      "above_at_season_start": false,
+      "observed_peak_week": "2017-02-05",
+      "observed_peak_value": 1.2223435335000001
+    },
+    {
+      "season": "2017-2018",
+      "complete": true,
+      "onset": "2017-10-15",
+      "above_at_season_start": false,
+      "observed_peak_week": "2018-01-28",
+      "observed_peak_value": 2.0355953151899997
+    },
+    {
+      "season": "2018-2019",
+      "complete": true,
+      "onset": "2018-10-14",
+      "above_at_season_start": false,
+      "observed_peak_week": "2019-02-10",
+      "observed_peak_value": 1.3109009913999998
+    },
+    {
+      "season": "2019-2020",
+      "complete": true,
+      "onset": "2019-10-20",
+      "above_at_season_start": false,
+      "observed_peak_week": "2020-02-02",
+      "observed_peak_value": 2.05812787572
+    },
+    {
+      "season": "2020-2021",
+      "complete": true,
+      "onset": null,
+      "above_at_season_start": false,
+      "observed_peak_week": "2020-10-04",
+      "observed_peak_value": 0.004698531512799999
+    },
+    {
+      "season": "2021-2022",
+      "complete": true,
+      "onset": "2021-11-21",
+      "above_at_season_start": false,
+      "observed_peak_week": "2021-12-19",
+      "observed_peak_value": 0.231057986016
+    },
+    {
+      "season": "2022-2023",
+      "complete": true,
+      "onset": "2022-10-02",
+      "above_at_season_start": true,
+      "observed_peak_week": "2022-11-20",
+      "observed_peak_value": 1.91673239685
+    },
+    {
+      "season": "2023-2024",
+      "complete": true,
+      "onset": "2023-10-08",
+      "above_at_season_start": false,
+      "observed_peak_week": "2023-12-24",
+      "observed_peak_value": 1.2342239009999998
+    },
+    {
+      "season": "2024-2025",
+      "complete": true,
+      "onset": "2024-10-27",
+      "above_at_season_start": false,
+      "observed_peak_week": "2025-01-26",
+      "observed_peak_value": 2.46822898938
+    },
+    {
+      "season": "2025-2026",
+      "complete": true,
+      "onset": "2025-11-02",
+      "above_at_season_start": false,
+      "observed_peak_week": "2025-12-21",
+      "observed_peak_value": 2.63095765267
+    },
+    {
+      "season": "2026-2027",
+      "complete": false,
+      "onset": null,
+      "above_at_season_start": true,
+      "observed_peak_week": "2026-10-04",
+      "observed_peak_value": 0.10369558483599998
+    }
+  ]
+}
