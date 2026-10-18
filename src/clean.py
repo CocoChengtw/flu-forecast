@@ -32,8 +32,8 @@ def iso_week_to_monday(week_str: str) -> pd.Timestamp:
     return pd.Timestamp(date.fromisocalendar(int(year), int(week), 1))
 
 
-def report_gaps(series_dates: pd.Series, name: str) -> None:
-    full = pd.date_range(series_dates.min(), series_dates.max(), freq="W-MON")
+def report_gaps(series_dates: pd.Series, name: str, freq: str = "W-MON") -> None:
+    full = pd.date_range(series_dates.min(), series_dates.max(), freq=freq)
     missing = full.difference(series_dates)
     print(f"[{name}] {series_dates.min().date()} to {series_dates.max().date()}, "
           f"{len(series_dates)} weeks, {len(missing)} missing weeks")
@@ -71,9 +71,9 @@ def clean_nwss() -> pd.DataFrame:
     df["sample_collect_date"] = pd.to_datetime(df["sample_collect_date"], errors="coerce")
     df = df.dropna(subset=["sample_collect_date", "pcr_target_avg_conc_lin"])
 
-    # Monday of the sample's week, to match the ISO weeks used by FluNet
+    # Sunday of the sample's week, to match the MMWR weeks used by ILINet / ILI+
     d = df["sample_collect_date"]
-    df["week_start"] = (d - pd.to_timedelta(d.dt.weekday, unit="D")).dt.normalize()
+    df["week_start"] = (d - pd.to_timedelta((d.dt.weekday + 1) % 7, unit="D")).dt.normalize()
 
     # Concentrations are log-normal and span orders of magnitude, so work on log10
     df["log10_conc"] = np.log10(df["pcr_target_avg_conc_lin"].clip(lower=0) + 1)
@@ -93,7 +93,7 @@ def clean_nwss() -> pd.DataFrame:
                     .reset_index()
                     .sort_values("week_start"))
 
-    report_gaps(out["week_start"], "nwss")
+    report_gaps(out["week_start"], "nwss", freq="W-SUN")
     return out
 
 
