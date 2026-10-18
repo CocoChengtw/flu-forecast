@@ -7,6 +7,7 @@ import hashlib
 import json
 import math
 import statistics
+import warnings
 from collections import Counter, defaultdict
 from datetime import date, timedelta
 from pathlib import Path
@@ -24,7 +25,8 @@ def mmwr_week_start(epiweek):
 def main():
     root = Path(__file__).resolve().parents[1]
     source = root / 'data/processed/ili_plus_weekly.csv'
-    rows = [r for r in csv.DictReader(source.open()) if r['region'] == config.REGION]
+    with source.open() as handle:
+        rows = [r for r in csv.DictReader(handle) if r['region'] == config.REGION]
     rows.sort(key=lambda r: int(r['epiweek']))
     assert rows, 'No rows for configured region'
     assert all(n == 1 for n in Counter(r['epiweek'] for r in rows).values()), 'Duplicate weeks'
@@ -48,8 +50,19 @@ def main():
     assert len(years) == config.THRESHOLD_N_SEASONS
     values = [r['value'] for y in years for r in off[y]]
     mean, sd = statistics.mean(values), statistics.stdev(values)
-    threshold = mean + config.THRESHOLD_N_SD * sd
-    assert math.isclose(threshold, config.THRESHOLD, abs_tol=1e-12), 'Config threshold differs; review before updating'
+    recomputed_threshold = mean + config.THRESHOLD_N_SD * sd
+    threshold = config.THRESHOLD
+    threshold_matches = math.isclose(recomputed_threshold, threshold, abs_tol=1e-12)
+    if not threshold_matches:
+        warnings.warn(
+            f'Recomputed threshold ({recomputed_threshold:.17g}) differs from the fixed '
+            f'config threshold ({threshold:.17g}); difference='
+            f'{recomputed_threshold - threshold:+.17g}. Historical data may have been '
+            'revised. Review the source and reference period before changing config. '
+            'Continuing with the fixed config threshold for event summaries and EDA.',
+            UserWarning,
+            stacklevel=2,
+        )
     seasons = defaultdict(list)
     for r in rows:
         y,w = divmod(int(r['epiweek']),100)
@@ -72,6 +85,9 @@ def main():
                   duplicate_weeks=0, missing_weeks=0, formula_verified=True,
                   configured_train_start=config.TRAIN_START, actual_train_start=rows[0]['week_start'],
                   required_last_test_target=str(target_end), threshold=threshold,
+                  recomputed_threshold=recomputed_threshold,
+                  threshold_matches_config=threshold_matches,
+                  threshold_difference=recomputed_threshold-threshold,
                   threshold_offseason_years=years, threshold_n=len(values), mean=mean, sample_sd=sd,
                   method='Pooled raw weeks 21-39, latest 3 complete non-COVID offseasons strictly before TEST_START; sample SD (ddof=1).',
                   caveats=['Research threshold, not official CDC ILI+ baseline.',

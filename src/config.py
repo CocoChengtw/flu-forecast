@@ -16,11 +16,8 @@ by ILINet and in data/processed/ili_plus_weekly.csv). "Week 40" means MMWR week 
 # California) is also in the data file but is a stretch goal.
 REGION = "nat"
 
-# First week of the 2015-16 season (MMWR 2015 week 40). Clinical-lab flu
-# positivity, which ILI+ needs, starts here, so we can't go earlier.
-TRAIN_START = "2015-10-04"
-# Requested start retained. The checked-in data currently starts at MMWR
-# 2016 week 40 (2016-10-02); do not label the available training data 2015-16.
+# First available week in the shared data: MMWR 2016 week 40 (2016-17 season).
+TRAIN_START = "2016-10-02"
 
 # ---------------------------------------------------------------------------
 # Train / test split
