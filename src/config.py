@@ -16,9 +16,8 @@ by ILINet and in data/processed/ili_plus_weekly.csv). "Week 40" means MMWR week 
 # California) is also in the data file but is a stretch goal.
 REGION = "nat"
 
-# First week of the 2015-16 season (MMWR 2015 week 40). Clinical-lab flu
-# positivity, which ILI+ needs, starts here, so we can't go earlier.
-TRAIN_START = "2015-10-04"
+# First available week in the shared data: MMWR 2016 week 40 (2016-17 season).
+TRAIN_START = "2016-10-02"
 
 # ---------------------------------------------------------------------------
 # Train / test split
@@ -66,13 +65,20 @@ COVID_END = "2021-09-26"     # MMWR 2021 week 39
 # non-influenza weeks of the 3 most recent seasons, plus 2 SD. CDC defines
 # non-influenza weeks with public-health-lab positive counts, which our data
 # doesn't include, so we simplify: off-season = MMWR weeks 21-39 (June to
-# September), when flu activity is minimal. Computed by A from the raw
+# September), when flu activity is minimal. Computed from the raw
 # (non-imputed) ILI+, using the last 3 non-COVID seasons.
 
 OFFSEASON_WEEKS = range(21, 40)   # MMWR weeks 21..39 inclusive
 THRESHOLD_N_SEASONS = 3
 THRESHOLD_N_SD = 2
-THRESHOLD = None   # ILI+ value; A fills this in once computed
+# Fixed before TEST_START: pooled raw MMWR weeks 21-39 in 2023, 2024, 2025
+# (offseasons of 2022-23, 2023-24, 2024-25); n=57; sample SD (ddof=1).
+# mean=0.013459370553024562, SD=0.007376367007064253.
+# Units match wili * pct_positive / 100 in the shared CSV; do NOT divide again.
+# Research threshold, not an official CDC ILI+ baseline. Historical onsets
+# often occur in October; value has not been tuned to force Nov-Dec onsets.
+# Reproduce and inspect caveats: python -m src.audit_threshold
+THRESHOLD = 0.02821210456715307
 
 # Onset week = first of this many consecutive weeks above THRESHOLD.
 ONSET_CONSECUTIVE_WEEKS = 2

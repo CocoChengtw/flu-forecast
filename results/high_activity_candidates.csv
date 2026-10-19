@@ -1,0 +1,7 @@
+reference,n,percentile,threshold,weeks_above
+recent_three_seasons,99,0.7,0.6624680555499999,30
+recent_three_seasons,99,0.75,0.69385838352,25
+recent_three_seasons,99,0.8,0.7914927495840001,20
+all_pretest_non_covid,264,0.7,0.5479783668449997,79
+all_pretest_non_covid,264,0.75,0.6788402657824999,66
+all_pretest_non_covid,264,0.8,0.8393415095700001,53

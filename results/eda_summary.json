@@ -1,0 +1,21 @@
+{
+  "threshold": 0.02821210456715307,
+  "pretest_seasons": 9,
+  "october_within_window_candidates": 7,
+  "october_candidates_not_ongoing_at_start": 6,
+  "no_onset_seasons": [
+    "2020-2021"
+  ],
+  "above_at_start": [
+    "2022-2023"
+  ],
+  "threshold_changed": false,
+  "interpretation": "Low-activity departure threshold; not validated as a hospital surge trigger. No tuning to test results.",
+  "caveats": [
+    "Same fixed pre-test threshold is applied retrospectively to earlier seasons for description only.",
+    "Peak window is weeks 40-20, while overlays show the full surveillance year.",
+    "The first onset week is only confirmed after the second consecutive exceedance.",
+    "Revised historical data are not real-time data vintages.",
+    "Window onset fields are candidates only; ongoing_at_window_start must not be scored as a new onset. Seasonal attribution of preceding runs requires a shared rule."
+  ]
+}
