@@ -36,6 +36,15 @@ TEST_START = "2025-09-28"
 # the last forecasts target 2026 week 24, which is already observed.
 TEST_END = "2026-05-17"
 
+# Test folds for robustness. The main results use 2025-26; 2024-25 is a second
+# fold (trained only on data before it) to check that model rankings are not
+# an artifact of a single season. Each fold: (first origin, last origin).
+TEST_FOLDS = {
+    "2025-26": (TEST_START, TEST_END),
+    "2024-25": ("2024-09-29", "2025-05-11"),   # MMWR 2024 week 40 to 2025 week 20
+}
+MAIN_FOLD = "2025-26"
+
 # ---------------------------------------------------------------------------
 # COVID-19 disruption
 # ---------------------------------------------------------------------------
