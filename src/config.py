@@ -80,6 +80,12 @@ THRESHOLD_N_SD = 2
 # Reproduce and inspect caveats: python -m src.audit_threshold
 THRESHOLD = 0.02821210456715307
 
+# High-activity threshold for surge decisions: 75th percentile of in-season
+# ILI+ (MMWR weeks 40-20) over the 3 most recent pre-test seasons
+# (2022-23, 2023-24, 2024-25), n=99. Proposed by Flora; reproduce with
+# python -m src.explore_high_activity_threshold
+HIGH_THRESHOLD = 0.69385838352
+
 # Onset week = first of this many consecutive weeks above THRESHOLD.
 ONSET_CONSECUTIVE_WEEKS = 2
 
