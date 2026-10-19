@@ -23,9 +23,16 @@ Multiplying them estimates the share of outpatient visits that are actually flu.
 
 The forecasts are framed around timing decisions, not just point estimates:
 
-1. **Threshold probability (priority):** the chance ILI+ goes above the threshold within the next 1–4 weeks.
-2. **Onset week:** the first of two consecutive weeks above the threshold.
+1. **Threshold probability (priority):** the chance ILI+ goes above a threshold within the next 1–4 weeks. If ILI+ is already above it, we show "Above threshold" instead, since the probability would stay near 100% for weeks.
+2. **Onset week:** the first of two consecutive weeks above the early-rise threshold.
 3. **Peak timing:** the chance the season peaks within the next 4 weeks.
+
+Two thresholds, both locked from pre-test data before looking at 2025–26 results:
+
+| Threshold | Value | Role |
+|---|---|---|
+| **High activity** (`HIGH_THRESHOLD`) | 0.694 | **Main output:** surge decisions (staffing, beds) |
+| **Early rise** (`EARLY_RISE_THRESHOLD`) | 0.028 | Secondary: activity rising above the summer floor |
 
 ## Data
 
@@ -58,9 +65,10 @@ All shared settings (dates, horizons, threshold, number of paths, random seed) l
 |---|---|
 | Training data | 2016–17 season onward (the first season with clinical-lab positivity in the Delphi data) |
 | Test period | 2025–26 season, MMWR weeks 40–20. Every week is a forecast origin, and each model sees only data up to that week. |
+| Second test fold | 2024–25, trained only on data before it, to check that model rankings hold beyond one season (`config.TEST_FOLDS`). |
 | Horizons | 1–4 weeks ahead |
 | COVID | 2020–21 (flu nearly absent) is replaced with the same-week mean of other pre-test seasons and flagged `is_imputed`. 2021–22 is kept as observed. |
-| Threshold | Off-season (MMWR weeks 21–39) mean + 2 SD over the last 3 non-COVID pre-test seasons, adapted from CDC's ILINet baseline method. A second, higher "high-activity" threshold is under discussion. |
+| Thresholds | **High activity:** 75th percentile of in-season ILI+ (weeks 40–20) over the 3 most recent pre-test seasons. **Early rise:** off-season (MMWR weeks 21–39) mean + 2 SD over the last 3 non-COVID pre-test seasons, adapted from CDC's ILINet baseline method. |
 | Uncertainty | Every model produces 500 simulated paths per origin. All probabilities are computed from these paths the same way for every model. |
 
 **Models**
@@ -90,7 +98,7 @@ Every model saves `results/forecasts/<model>.csv` with these columns:
 | `path_id` | simulated path, 0–499 |
 | `value` | forecast ILI+ |
 
-Plug a model into the rolling-origin framework in `src/evaluate.py` and it writes this file for you. Run `python -m src.diagnostics <model>` to check a model's intervals before trusting its probabilities.
+Plug a model into the rolling-origin framework in `src/evaluate.py` and it writes this file for you. Run both folds: `rolling_forecast(model_fn, "<model>")` and `rolling_forecast(model_fn, "<model>", fold="2024-25")`; the second fold is saved in `results/forecasts/fold_2024-25/`. Run `python -m src.diagnostics <model>` to check a model's intervals before trusting its probabilities.
 
 ## Repo structure
 
@@ -107,7 +115,7 @@ flu-forecast/
 │   └── ...                 models, probabilities, diagnostics
 ├── notebooks/          exploration notebooks
 ├── results/
-│   ├── forecasts/      one CSV per model, shared format above
+│   ├── forecasts/      one CSV per model, shared format above (fold_2024-25/ for the second fold)
 │   └── figures/
 ├── notes/              decision log for the methods and limitations slides
 ├── app/                Streamlit dashboard
@@ -179,7 +187,7 @@ Then open a Pull Request on GitHub to merge into `main`.
 | Date | Milestone |
 |---|---|
 | Sun 10/18 | Data fetched; EDA starts; evaluation framework and naive baseline done |
-| Mon 10/19 | Models run in parallel; dashboard skeleton; threshold finalized |
+| Mon 10/19 | Models run in parallel (both folds); dashboard skeleton; thresholds finalized |
 | Tue 10/20 noon | All model results ready |
 | Tue 10/20 afternoon | Probability outputs; dashboard integrated and deployed; slides built |
 | **Tue 10/20 night** | **Results frozen: no number changes after this** |
