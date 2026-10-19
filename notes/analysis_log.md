@@ -60,16 +60,16 @@ Key decisions and the reasons behind them, for the methods and limitations slide
 - No window is best on both folds. ±4 averages ≈ 0.90 coverage across the two folds with narrower shoulder intervals than ±6/±8, so we keep it rather than tune it on test results. Every seasonal window fixes the absurd shoulder intervals.
 
 ## 6. Thresholds (Flora; `python -m src.audit_threshold`)
-Two thresholds, both fixed from pre-test data only:
+Two thresholds, both locked from pre-test data before looking at 2025–26 results:
 
-| Threshold | Value | Method | Meaning |
+| Threshold | Value | Method | Role |
 |---|---|---|---|
-| **Onset** | 0.0282 | Mean + 2 SD of off-season ILI+ (MMWR weeks 21–39), 2023–2025, raw data | Activity rising above the summer floor: early warning |
-| **High activity** | 0.6939 | 75th percentile of in-season ILI+ (weeks 40–20), 3 most recent pre-test seasons | Surge decisions (staffing, beds) |
+| **High activity** (`HIGH_THRESHOLD`) | 0.6939 | 75th percentile of in-season ILI+ (weeks 40–20), 2022–23 to 2024–25 | **Main output:** surge decisions (staffing, beds) |
+| **Early rise** (`EARLY_RISE_THRESHOLD`) | 0.0282 | Mean + 2 SD of off-season ILI+ (MMWR weeks 21–39), 2023–2025, raw data | Secondary: activity rising above the summer floor |
 
-- The onset threshold is *adapted from* CDC's ILINet baseline: CDC defines non-flu weeks using public-health-lab counts, which our data lacks.
-- **Onset week** = the first of 2 consecutive weeks above the onset threshold. It captures the early rise, so historical onsets are mostly in October (7 of 9 pre-test seasons).
-- On its own, the onset threshold is exceeded in 28 of 34 test weeks, so crossing probabilities would be ~100% most of the season. Hence the second threshold: historical high-activity starts fall in Dec–Jan (Nov in the early 2022–23 season), the small 2021–22 season never crosses, and 10 of 34 test weeks are above it.
+- **Event rule:** if ILI+ is currently below a threshold, report P(any of the next 1–4 weeks is above it). If it is already above, show "Above threshold" instead of a probability, since it would stay near 100% for weeks.
+- Why two: the early-rise threshold alone is exceeded in 28 of 34 test weeks, so probabilities would be ~100% most of the season. With the high-activity threshold, historical crossings fall in Dec–Jan (Nov in the early 2022–23 season), the small 2021–22 season never crosses, and 10 of 34 test weeks are above it.
+- The early-rise threshold is *adapted from* CDC's ILINet baseline (CDC defines non-flu weeks using public-health-lab counts, which our data lacks). Its first 2-week crossing falls in October in 7 of 9 pre-test seasons.
 
 ## 7. Limitations
 - **One main test season:** results rest on 2025–26; the 2024–25 fold is a robustness check, not a full replication.
