@@ -94,5 +94,6 @@ def seasonal_naive(train: pd.Series, horizon: int, n_paths: int,
 
 
 if __name__ == "__main__":
-    fc = rolling_forecast(seasonal_naive, "naive")
-    print(point_metrics(fc).to_string(index=False))
+    for fold in config.TEST_FOLDS:
+        fc = rolling_forecast(seasonal_naive, "naive", fold=fold)
+        print(point_metrics(fc).to_string(index=False))

@@ -13,8 +13,9 @@ Checks whether the 500 paths are sensible, not just whether the median is accura
 Usage, from the repo root:
     python -m src.diagnostics naive              # diagnose saved forecast files
     python -m src.diagnostics naive ets chronos
-    python -m src.diagnostics --naive-variants   # compare naive with/without seasonal window
+    python -m src.diagnostics --naive-variants   # naive with different seasonal windows
     python -m src.diagnostics naive --by-week    # also print the per-target-week table
+    python -m src.diagnostics naive --fold 2024-25   # a different test fold
 """
 
 import argparse
@@ -23,15 +24,16 @@ from functools import partial
 import numpy as np
 import pandas as pd
 
-from src.evaluate import FORECAST_DIR, load_data, rolling_forecast
+from src import config
+from src.evaluate import forecast_path, load_data, rolling_forecast
 
 # MMWR weeks 48-53 and 1-11 (roughly Dec-mid Mar) are the usual peak period.
 # The rest of the test season (Oct-Nov, mid Mar-May) is the "shoulder".
 PEAK_WEEKS = set(range(48, 54)) | set(range(1, 12))
 
 
-def load_forecasts(model: str) -> pd.DataFrame:
-    return pd.read_csv(FORECAST_DIR / f"{model}.csv", parse_dates=["origin", "target_week"])
+def load_forecasts(model: str, fold: str = config.MAIN_FOLD) -> pd.DataFrame:
+    return pd.read_csv(forecast_path(model, fold), parse_dates=["origin", "target_week"])
 
 
 def quantile_table(forecasts: pd.DataFrame) -> pd.DataFrame:
@@ -76,15 +78,14 @@ def by_target_week(forecasts: pd.DataFrame) -> pd.DataFrame:
     }).reset_index()
 
 
-def naive_variants() -> pd.DataFrame:
-    """Re-run seasonal naive with and without the seasonal error window (not saved)."""
+def naive_variants(fold: str = config.MAIN_FOLD) -> pd.DataFrame:
+    """Re-run seasonal naive with different seasonal error windows (not saved).
+    None = errors from all weeks of the year (the original version)."""
     from src.naive import seasonal_naive  # noqa: PLC0415
 
-    runs = [
-        rolling_forecast(partial(seasonal_naive, season_window=None),
-                         "naive_all_weeks", save=False),
-        rolling_forecast(seasonal_naive, "naive_seasonal_window", save=False),
-    ]
+    runs = [rolling_forecast(partial(seasonal_naive, season_window=w),
+                             f"naive_window_{w}", save=False, fold=fold)
+            for w in (2, 4, 6, 8, None)]
     return summarize(pd.concat(runs, ignore_index=True))
 
 
@@ -93,13 +94,14 @@ def main() -> None:
     parser.add_argument("models", nargs="*", help="forecast files in results/forecasts/")
     parser.add_argument("--naive-variants", action="store_true")
     parser.add_argument("--by-week", action="store_true")
+    parser.add_argument("--fold", default=config.MAIN_FOLD, choices=list(config.TEST_FOLDS))
     args = parser.parse_args()
 
     pd.set_option("display.width", 120)
     if args.naive_variants:
-        print(naive_variants().round(3).to_string(index=False))
+        print(naive_variants(args.fold).round(3).to_string(index=False))
     if args.models:
-        fc = pd.concat([load_forecasts(m) for m in args.models], ignore_index=True)
+        fc = pd.concat([load_forecasts(m, args.fold) for m in args.models], ignore_index=True)
         print(summarize(fc).round(3).to_string(index=False))
         if args.by_week:
             table = by_target_week(fc)
