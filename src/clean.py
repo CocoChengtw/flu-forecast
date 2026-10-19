@@ -16,6 +16,7 @@ Run from the repo root:
 """
 
 from datetime import date
+import argparse
 from pathlib import Path
 
 import numpy as np
@@ -26,6 +27,50 @@ RAW = ROOT / "data" / "raw"
 PROCESSED = ROOT / "data" / "processed"
 
 MIN_SITE_WEEKS = 20  # sites with less history are too noisy to standardize
+SITE_COUNT_WINDOW = 8
+SITE_COUNT_MIN_HISTORY = 4
+MIN_SITE_COUNT_RATIO = 0.5
+
+
+def filter_reporting_coverage(df: pd.DataFrame, groups=()):
+    """Keep weeks with >=50% of the prior 8-week median site count.
+
+    Use each geography's own history, with at least four prior reporting weeks.
+    Calendar gaps contribute zero sites. Return retained rows and an audit table.
+    This is a project completeness screen, not a CDC quality standard.
+    """
+    pieces = []
+    grouped = df.groupby(list(groups), dropna=False) if groups else [(None, df)]
+    for _, frame in grouped:
+        frame = frame.copy()
+        frame['week_start'] = pd.to_datetime(frame['week_start'])
+        frame = frame.sort_values('week_start')
+        if frame.week_start.duplicated().any():
+            raise ValueError('Duplicate geography/week in wastewater data')
+        counts = frame.set_index('week_start').n_sites
+        calendar = pd.date_range(counts.index.min(), counts.index.max(), freq='W-SUN')
+        counts = counts.reindex(calendar, fill_value=0)
+        typical = counts.shift(1).rolling(SITE_COUNT_WINDOW, min_periods=SITE_COUNT_MIN_HISTORY).median()
+        reported = counts.gt(0).astype(int).shift(1).rolling(SITE_COUNT_WINDOW, min_periods=SITE_COUNT_MIN_HISTORY).sum()
+        typical = typical.where(reported >= SITE_COUNT_MIN_HISTORY)
+        frame['typical_n_sites'] = frame.week_start.map(typical)
+        frame['site_count_ratio'] = frame.n_sites / frame.typical_n_sites.where(frame.typical_n_sites > 0)
+        frame['coverage_status'] = np.where(frame.site_count_ratio.isna(), 'insufficient_history',
+            np.where(frame.site_count_ratio >= MIN_SITE_COUNT_RATIO, 'pass', 'low_site_count'))
+        pieces.append(frame)
+    audit = pd.concat(pieces, ignore_index=True)
+    return audit.loc[audit.coverage_status.eq('pass')].copy(), audit
+
+
+def save_coverage_outputs(national, state):
+    """Preserve original aggregates; charts/maps should use *_filtered.csv."""
+    for name, frame, groups in [('nwss_flu_a_weekly', national, ()),
+                                ('nwss_flu_a_state_weekly', state, ('state',))]:
+        filtered, audit = filter_reporting_coverage(frame, groups)
+        filtered.to_csv(PROCESSED / f'{name}_filtered.csv', index=False)
+        audit.to_csv(PROCESSED / f'{name}_coverage.csv', index=False)
+        print(f'[{name}] retained {len(filtered)}/{len(audit)} rows; '
+              f'{audit.coverage_status.value_counts().to_dict()}')
 
 
 def iso_week_to_monday(week_str: str) -> pd.Timestamp:
@@ -118,7 +163,16 @@ def clean_nwss() -> tuple[pd.DataFrame, pd.DataFrame]:
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--coverage-only', action='store_true',
+                        help='Apply coverage screen to existing aggregates without raw downloads')
+    args = parser.parse_args()
     PROCESSED.mkdir(parents=True, exist_ok=True)
+
+    if args.coverage_only:
+        save_coverage_outputs(pd.read_csv(PROCESSED / 'nwss_flu_a_weekly.csv'),
+                              pd.read_csv(PROCESSED / 'nwss_flu_a_state_weekly.csv'))
+        return
 
     flu = clean_flunet()
     flu.to_csv(PROCESSED / "flu_positivity_us_weekly.csv", index=False)
@@ -126,6 +180,7 @@ def main() -> None:
     ww_national, ww_state = clean_nwss()
     ww_national.to_csv(PROCESSED / "nwss_flu_a_weekly.csv", index=False)
     ww_state.to_csv(PROCESSED / "nwss_flu_a_state_weekly.csv", index=False)
+    save_coverage_outputs(ww_national, ww_state)
 
     print("Saved to data/processed/")
 
