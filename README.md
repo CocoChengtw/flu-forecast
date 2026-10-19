@@ -83,7 +83,7 @@ All shared settings (dates, horizons, threshold, number of paths, random seed) l
 - Threshold probabilities: Brier score
 - Timing: error in onset week and peak week, in weeks
 
-**Wastewater (stretch goal):** a lead-time analysis of wastewater vs. ILI+ only. The wastewater history (about 3 seasons) is too short to use as a model input.
+**Wastewater (stretch goal):** a lead-time analysis of wastewater vs. influenza-A ILI+ only. The wastewater history is too short to use as a model input. Use `ili_plus_a_weekly.csv` and the `nwss_flu_a_*_filtered.csv` files for the comparison/map; original aggregates remain available for audit. The coverage screen uses each geography's prior-eight-week median site count, with a 50% cutoff. See [wastewater preparation and map guidance](notes/wastewater_stretch.md) for limitations, missing-week handling, and reproduction commands.
 
 ### Shared forecast output format
 
