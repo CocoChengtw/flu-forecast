@@ -225,3 +225,6 @@ data/raw/nwss_flu_a.csv
 # R
 .Rhistory
 .RData
+
+# Dashboard (Node)
+node_modules/

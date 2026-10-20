@@ -8,7 +8,7 @@ Group final project for Time Series Analysis and Forecasting (UCLA Anderson, Dr.
 
 Give a local health department or hospital operations team early warning of the flu season, so they can decide when to add staff and beds, push vaccination messaging, and alert providers.
 
-We forecast weekly U.S. **ILI+** 1–4 weeks ahead and compare classical statistical models with an AI forecasting model. The best results are shown in a Streamlit dashboard with an AI assistant that explains the forecast in plain language.
+We forecast weekly U.S. **ILI+** 1–4 weeks ahead and compare classical statistical models with an AI forecasting model. The best results are shown in a web dashboard with an AI assistant that explains the forecast in plain language.
 
 ### Forecast target: ILI+
 
@@ -118,7 +118,7 @@ flu-forecast/
 │   ├── forecasts/      one CSV per model, shared format above (fold_2024-25/ for the second fold)
 │   └── figures/
 ├── notes/              decision log for the methods and limitations slides
-├── app/                Streamlit dashboard
+├── app/                dashboard (React page + Python assistant), see app/README.md
 ├── forecasting_project_handbook.md   course concepts, from the lecture decks
 ├── requirements.txt
 ├── .env.example
@@ -179,7 +179,7 @@ Then open a Pull Request on GitHub to merge into `main`.
 | A | Data, EDA, threshold calculation, wastewater (stretch) |
 | B | Evaluation framework, preprocessing, classical models |
 | C | Chronos, probability outputs, optional LLM comparison |
-| D | Streamlit dashboard, AI assistant, deployment |
+| D | Dashboard, AI assistant, deployment |
 | E | Slides, storytelling, written deliverables (incl. product description and AI-tools statement) |
 
 ## Timeline
