@@ -45,9 +45,10 @@ def get_client() -> anthropic.Anthropic:
     return _client
 
 
-@lru_cache(maxsize=1)
+@lru_cache(maxsize=4)
 def system_prompt(data_mtime: float, view: str = "") -> str:
-    """Instructions plus a compact copy of the dashboard numbers. Cached per data version."""
+    """Instructions plus a compact copy of the dashboard numbers. Cached per data version.
+    Keep in sync with netlify/functions/ask.mts, the hosted version of this assistant."""
     file = json.loads(DATA.read_text())
     # data.json has shared parts plus one view per week; answer about the view on screen
     views = file.pop("views")
@@ -88,8 +89,10 @@ How the dashboard works:
   surge line within 4 weeks), Surge watch (50% or more), Surge (above the surge line).
 - The surge line is the 75th percentile of in-season weeks over the last 3 seasons.
 - Forecasts are 500 simulated paths per week; "likely range" is the 5th to 95th percentile.
-- Today's forecast comes from the seasonal baseline (same week last year plus past misses), which
-  can lag a season that starts earlier than last year. ETS, ARIMA, Prophet and Chronos have backtest
+- Two views: the case study (a past week, every model has a forecast, the signal uses an
+  equal-weight pool of all five, outcome known) and the latest week, whose forecast comes from the
+  seasonal baseline (same week last year plus past misses), which can lag a season that starts
+  earlier than last year. ETS, ARIMA, Prophet and Chronos have backtest
   results (models_with_results): the most accurate models follow momentum and warn late, while the
   seasonal baseline and Prophet warn of surges weeks earlier. Chronos's ranges are too narrow.
 - 2020-21 is excluded because flu nearly disappeared during COVID.

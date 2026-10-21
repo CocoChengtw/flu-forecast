@@ -38,7 +38,20 @@ Save forecasts with `rolling_forecast(...)` as usual. Re-run `export_data.py`
 and the model card switches from "Due" to "Ready". To drive this week's
 forecast, also save one origin to `results/forecasts/live/<model>.csv`.
 
-## Deploy
+## Deploy (Netlify)
 
-`npm run build`, then run `python assistant_server.py --port 8080` on any host
-that runs Python: it serves `dist/` and the API together.
+`app/netlify.toml` builds the page and deploys the AI assistant as a Netlify Function at
+`/api/ask` (`netlify/functions/ask.mts`, same instructions as `assistant_server.py`).
+
+```bash
+cd app
+npx netlify-cli login                 # once
+npx netlify-cli deploy --build --prod # creates or updates the site
+```
+
+For live AI answers, set `ANTHROPIC_API_KEY` in the site's environment variables
+(Site configuration > Environment variables) and redeploy. Anyone with the link can use the
+assistant, so watch usage on that key. Without a key, the suggested questions still answer
+from the page's numbers.
+
+Re-run `python app/export_data.py` before deploying so `public/data.json` is current.
