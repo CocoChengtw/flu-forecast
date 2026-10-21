@@ -50,22 +50,38 @@ def simulate(fit, train: pd.Series, **kwargs):
     rng = rng_for(train)
     if "rng" in inspect.signature(fit.simulate).parameters:
         return fit.simulate(**kwargs, rng=rng)
-    # Older statsmodels only accepts an int or np.random.RandomState here
-    return fit.simulate(**kwargs, random_state=int(rng.integers(2**31 - 1)))
+    # Older statsmodels only accepts an int or np.random.RandomState here, and
+    # SARIMAX in 0.14 still draws part of the simulation from the global numpy
+    # RNG, so seed that too or ARIMA paths change between runs.
+    seed = int(rng.integers(2**31 - 1))
+    np.random.seed(seed)
+    return fit.simulate(**kwargs, random_state=seed)
 
 
 # ---------------------------------------------------------------------------
 # ETS: additive error, damped additive trend, additive seasonality (on log scale)
 # ---------------------------------------------------------------------------
-def ets(train: pd.Series, horizon: int, n_paths: int) -> np.ndarray:
+def fit_ets(train: pd.Series):
     from statsmodels.tsa.exponential_smoothing.ets import ETSModel  # noqa: PLC0415
 
     y = pd.Series(to_log(train.values))
     model = ETSModel(y, error="add", trend="add", damped_trend=True,
                      seasonal="add", seasonal_periods=52)
+    # The fit estimates 58 parameters (52 are seasonal starting values), so it needs
+    # ~45,000 likelihood evaluations. scipy's default cap (maxfun=15,000) stopped
+    # every fit early, unconverged; raising maxiter alone does not lift that cap.
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        fit = model.fit(disp=False, maxiter=200)
+        fit = model.fit(disp=False, maxiter=2000, maxfun=200_000)
+    if not fit.mle_retvals["converged"]:
+        print(f"[ets] warning: fit did not converge at origin {train.index[-1].date()}")
+    return fit
+
+
+def ets(train: pd.Series, horizon: int, n_paths: int) -> np.ndarray:
+    fit = fit_ets(train)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
         sims = simulate(fit, train, nsimulations=horizon, anchor="end",
                         repetitions=n_paths)
     return from_log(np.asarray(sims).T)
