@@ -1,0 +1,69 @@
+@import "tailwindcss";
+@import "@fontsource-variable/public-sans";
+
+/*
+  Design tokens. White page with light-blue bands, one blue accent for data.
+  The four level colors are semantic and only mark risk. Light theme only,
+  a deliberate choice for this public-health page.
+  Shapes: panels 16px, controls fully rounded.
+*/
+:root {
+  --bg: #ffffff;
+  --surface: #ffffff;
+  --sky: #eef5fc;
+  --sunken: #e3eef9;
+  --ink: #13253a;
+  --muted: #536579;
+  --line: #d9e5f1;
+  --accent: #1c63b7;
+  --accent-soft: rgb(28 99 183 / 0.16);
+  --accent-softer: rgb(28 99 183 / 0.07);
+  --past: #b8c6d4;
+  --normal: rgb(83 101 121 / 0.12);
+  --quiet: #2e8656;
+  --elevated: #c48a0a;
+  --watch: #d4661c;
+  --surge: #c0362c;
+  color-scheme: light;
+}
+
+@theme inline {
+  --font-sans: "Public Sans Variable", ui-sans-serif, system-ui, sans-serif;
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-sky: var(--sky);
+  --color-sunken: var(--sunken);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-accent: var(--accent);
+  --color-quiet: var(--quiet);
+  --color-elevated: var(--elevated);
+  --color-watch: var(--watch);
+  --color-surge: var(--surge);
+}
+
+html {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+input[type="range"] {
+  accent-color: var(--accent);
+}
+
+/* Grid columns may shrink below their content, so charts can resize down on narrow screens */
+.grid > * {
+  min-width: 0;
+}

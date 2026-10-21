@@ -1,0 +1,17 @@
+# Netlify: deploy with the site's base directory set to `app`.
+# The page is static (dist/); the AI assistant is a function at /api/ask.
+# Set ANTHROPIC_API_KEY in the site's environment variables for live AI answers.
+
+[build]
+  command = "npm run build"
+  publish = "dist"
+  functions = "netlify/functions"
+
+[build.environment]
+  NODE_VERSION = "20"
+  NPM_FLAGS = "--legacy-peer-deps"
+
+[[headers]]
+  for = "/data.json"
+  [headers.values]
+    Cache-Control = "public, max-age=300"
