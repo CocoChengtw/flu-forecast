@@ -1,8 +1,11 @@
-pandas
-numpy
+# Pinned: these versions reproduce the committed ETS/ARIMA forecasts exactly;
+# numpy 1.26 + statsmodels 0.14 give paths that differ by up to ~4 ILI+.
+pandas==3.0.6
+numpy==2.5.4
+scipy==1.18.1
 matplotlib
 plotly
-statsmodels
+statsmodels==0.15.0
 statsforecast
 prophet
 torch
