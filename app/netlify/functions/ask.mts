@@ -4,7 +4,8 @@
 //
 // POST /api/ask  {"question": "...", "history": [...], "view": "case" | "latest"}
 //            ->  {"answer": "..."}
-// Needs ANTHROPIC_API_KEY in the Netlify site's environment variables.
+// Uses ANTHROPIC_API_KEY from the site's environment; Netlify's AI Gateway supplies one
+// automatically when enabled (usage billed to the Netlify account).
 
 import Anthropic from "@anthropic-ai/sdk";
 import type { Config } from "@netlify/functions";
@@ -71,6 +72,7 @@ ${JSON.stringify(facts)}
 
 Answer rules:
 - Use only these numbers. If the answer is not in them, say so plainly.
+- Plain text only (no markdown, bold or bullets): the chat shows raw text.
 - Plain words, short sentences, at most 90 words. No headings, no tables, no em dashes.
 - Use "per 1,000 visits" for values and whole percentages for chances.
 - You may suggest practical actions, but do not give individual medical advice.`;
@@ -129,4 +131,8 @@ export default async (req: Request): Promise<Response> => {
   }
 };
 
-export const config: Config = { path: "/api/ask" };
+export const config: Config = {
+  path: "/api/ask",
+  // Public page: cap each visitor at 20 questions a minute to limit AI usage costs
+  rateLimit: { windowLimit: 20, windowSize: 60, aggregateBy: ["ip", "domain"] },
+};

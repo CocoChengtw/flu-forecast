@@ -105,6 +105,7 @@ Dashboard numbers (JSON):
 
 Answer rules:
 - Use only these numbers. If the answer is not in them, say so plainly.
+- Plain text only (no markdown, bold or bullets): the chat shows raw text.
 - Plain words, short sentences, at most 90 words. No headings, no tables, no em dashes.
 - Use "per 1,000 visits" for values and whole percentages for chances.
 - You may suggest practical actions, but do not give individual medical advice."""

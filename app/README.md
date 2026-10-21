@@ -49,9 +49,10 @@ npx netlify-cli login                 # once
 npx netlify-cli deploy --build --prod # creates or updates the site
 ```
 
-For live AI answers, set `ANTHROPIC_API_KEY` in the site's environment variables
-(Site configuration > Environment variables) and redeploy. Anyone with the link can use the
-assistant, so watch usage on that key. Without a key, the suggested questions still answer
+Live AI answers need an Anthropic key in the function's environment. Netlify's AI Gateway
+provides one automatically when it's enabled on the account (usage billed to Netlify credits);
+otherwise set `ANTHROPIC_API_KEY` in Site configuration > Environment variables. Anyone with the
+link can use the assistant, so the function is rate-limited to 20 questions a minute per visitor. Without a key, the suggested questions still answer
 from the page's numbers.
 
 Re-run `python app/export_data.py` before deploying so `public/data.json` is current.
