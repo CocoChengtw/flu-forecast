@@ -45,7 +45,10 @@ export type Surge = {
 
 export type Season = { season: number; label: string; points: [number, number][] };
 
+export type ModelForecast = Bands & { id: string; name: string; chance: number[] | null };
+
 export type Dashboard = {
+  mode: "case" | "latest";       // case study (outcome known) or the latest week
   updated: string;
   lines: { surge: number; season: number };
   now: {
@@ -60,6 +63,8 @@ export type Dashboard = {
   recent: { date: string; v: number }[];
   weekly: { date: string; v: number }[];
   forecast: Bands & { dates: string[] };
+  modelForecasts: ModelForecast[];   // every model's forecast for this week (case study: all five)
+  outcome: { actual: number[]; crossing: string | null; peak: string; peakValue: number } | null;
   layers: { date: string; lo: number | null; mid: number | null; hi: number | null; last: number | null }[];
   stats: {
     medianPeak: number;
@@ -96,11 +101,21 @@ export type Dashboard = {
   mainFold: string;
 };
 
-export async function loadDashboard(): Promise<Dashboard> {
+// data.json holds shared parts (model backtests, weekly series) plus one view per week.
+type Shared = "lines" | "weekly" | "models" | "mainFold";
+export type View = Omit<Dashboard, Shared>;
+export type DashboardFile = Pick<Dashboard, Shared> & { views: Record<string, View>; defaultView: string };
+
+export async function loadDashboard(): Promise<DashboardFile> {
   const res = await fetch("./data.json");
   if (!res.ok) throw new Error(`data.json returned ${res.status}`);
   return res.json();
 }
+
+export const viewOf = (file: DashboardFile, key: string): Dashboard => {
+  const { views, defaultView, ...shared } = file;
+  return { ...shared, ...(views[key] ?? views[defaultView]) };
+};
 
 // Dates arrive as YYYY-MM-DD; parse as local dates so labels don't shift a day.
 export const toDate = (s: string) => {

@@ -1,8 +1,8 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
 import { scaleLinear, scaleTime } from "d3-scale";
 import { area, curveMonotoneX, line } from "d3-shape";
-import { pct, toDate, type Dashboard } from "../data";
+import { pct, toDate, type Dashboard, type ModelForecast } from "../data";
 import { useWidth } from "../useWidth";
 
 const M = { top: 26, right: 58, bottom: 28, left: 34 };
@@ -12,12 +12,30 @@ const M = { top: 26, right: 58, bottom: 28, left: 34 };
  * last season, this season's reported weeks, then the 4-week forecast with the
  * chance of crossing the surge line on each week.
  */
-export function ForecastChart({ data, height = 340, animKey }: { data: Dashboard; height?: number; animKey: string }) {
+type Props = {
+  data: Dashboard;
+  height?: number;
+  animKey: string;
+  pick?: ModelForecast | null;     // show one model's forecast instead of the main one
+  actual?: number[] | null;        // what happened next (case study)
+};
+
+export function ForecastChart({ data, height = 340, animKey, pick, actual }: Props) {
   const [ref, width] = useWidth<HTMLDivElement>();
   const reduce = useReducedMotion();
   const [hover, setHover] = useState<number | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
-  const { forecast, lines, layers, now, stats } = data;
+  const { lines, layers, stats } = data;
+  const forecast = pick ? { ...pick, dates: data.forecast.dates } : data.forecast;
+  const now = { ...data.now, chance: pick ? pick.chance : data.now.chance };
+  const fanKey = `${animKey}-${pick?.id ?? "main"}`;
+  // The full staged entrance plays on load; switching models later swaps the fan quickly
+  const entering = useRef(true);
+  useEffect(() => {
+    entering.current = true;
+    const t = setTimeout(() => { entering.current = false; }, 2600);
+    return () => clearTimeout(t);
+  }, [animKey]);
 
   const obs = data.recent.map((d) => ({ date: toDate(d.date), v: d.v }));
   const origin = obs[obs.length - 1];
@@ -32,7 +50,7 @@ export function ForecastChart({ data, height = 340, animKey }: { data: Dashboard
   const innerH = height - M.top - M.bottom;
   // Scale to what's happening now (reported, normal range, 50% forecast range). When the
   // surge line is far above, it's marked at the top instead of flattening everything.
-  const dataMax = Math.max(...obs.map((d) => d.v), ...forecast.p75, ...lay.map((l) => l.hi ?? 0)) * 1.35;
+  const dataMax = Math.max(...obs.map((d) => d.v), ...forecast.p75, ...lay.map((l) => l.hi ?? 0), ...(actual ?? [])) * 1.35;
   const surgeOnChart = lines.surge <= dataMax * 1.6;
   const yMax = surgeOnChart ? Math.max(dataMax, lines.surge * 1.15) : dataMax;
   const x = scaleTime().domain([obs[0].date, fc[fc.length - 1].date]).range([0, innerW]);
@@ -113,9 +131,9 @@ export function ForecastChart({ data, height = 340, animKey }: { data: Dashboard
                            strokeDasharray="2 4" strokeLinecap="round"
                            initial={{ opacity: reduce ? 0.8 : 0 }} animate={{ opacity: 0.8 }} transition={{ delay: s(0.3), duration: s(0.6) }} />
               {/* Layer 4: forecast fan, grows out of today */}
-              <motion.g key={`fan-${animKey}`} initial={reduce ? false : { opacity: 0, scaleX: 0 }} animate={{ opacity: 1, scaleX: 1 }}
+              <motion.g key={`fan-${fanKey}`} initial={reduce ? false : { opacity: 0, scaleX: 0 }} animate={{ opacity: 1, scaleX: 1 }}
                         style={{ originX: 0, transformBox: "fill-box" }}
-                        transition={{ delay: s(1.5), duration: s(0.8), ease: [0.16, 1, 0.3, 1] }}>
+                        transition={{ delay: entering.current ? s(1.5) : 0, duration: s(entering.current ? 0.8 : 0.45), ease: [0.16, 1, 0.3, 1] }}>
                 <path d={outer} fill="var(--accent-softer)" />
                 <path d={inner} fill="var(--accent-soft)" />
                 <path d={median} fill="none" stroke="var(--accent)" strokeWidth={2.5} strokeDasharray="6 5" />
@@ -141,8 +159,8 @@ export function ForecastChart({ data, height = 340, animKey }: { data: Dashboard
 
             {/* Chance of crossing the surge line by the end of the forecast */}
             {now.chance && (
-              <motion.text key={`ch-${animKey}`} x={x(lastFc.date)} y={-12} textAnchor="end" fontSize={11} fontWeight={600}
-                           fill="var(--ink)" initial={{ opacity: reduce ? 1 : 0 }} animate={{ opacity: 1 }} transition={{ delay: s(2) }}>
+              <motion.text key={`ch-${fanKey}`} x={x(lastFc.date)} y={-12} textAnchor="end" fontSize={11} fontWeight={600}
+                           fill="var(--ink)" initial={{ opacity: reduce ? 1 : 0 }} animate={{ opacity: 1 }} transition={{ delay: entering.current ? s(2) : s(0.2) }}>
                 Surge chance by {lastFc.date.toLocaleDateString("en-US", { month: "short", day: "numeric" })}:{" "}
                 <tspan fontWeight={800} fill={now.chance[now.chance.length - 1] >= 0.5 ? "var(--surge)" : "var(--accent)"}>
                   {pct(now.chance[now.chance.length - 1])}
@@ -150,11 +168,19 @@ export function ForecastChart({ data, height = 340, animKey }: { data: Dashboard
               </motion.text>
             )}
             <text x={fanStart - 6} y={12} textAnchor="end" fontSize={11} fontWeight={600} fill="var(--muted)">Today</text>
-            <motion.text key={`end-${animKey}`} x={x(lastFc.date) + 8} y={y(lastFc.p50)} dy="0.32em" fontSize={12} fontWeight={700}
+            <motion.text key={`end-${fanKey}`} x={x(lastFc.date) + 8} y={y(lastFc.p50)} dy="0.32em" fontSize={12} fontWeight={700}
                          fill="var(--accent)" className="tabular" initial={{ opacity: reduce ? 1 : 0 }} animate={{ opacity: 1 }}
-                         transition={{ delay: s(2.3) }}>
+                         transition={{ delay: entering.current ? s(2.3) : s(0.3) }}>
               {lastFc.p50.toFixed(1)}
             </motion.text>
+
+            {/* What happened next (case study) */}
+            {actual?.map((v, i) => (
+              <motion.circle key={`act-${animKey}-${i}`} cx={x(fc[i].date)} cy={y(v)} r={5.5} fill="var(--surface)"
+                             stroke="var(--ink)" strokeWidth={2.5}
+                             initial={{ opacity: reduce ? 1 : 0, scale: reduce ? 1 : 0.3 }} animate={{ opacity: 1, scale: 1 }}
+                             transition={{ delay: reduce ? 0 : i * 0.15, type: "spring", stiffness: 260, damping: 18 }} />
+            ))}
 
             {h && (
               <g pointerEvents="none">

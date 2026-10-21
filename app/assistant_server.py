@@ -46,12 +46,20 @@ def get_client() -> anthropic.Anthropic:
 
 
 @lru_cache(maxsize=1)
-def system_prompt(data_mtime: float) -> str:
+def system_prompt(data_mtime: float, view: str = "") -> str:
     """Instructions plus a compact copy of the dashboard numbers. Cached per data version."""
-    d = json.loads(DATA.read_text())
+    file = json.loads(DATA.read_text())
+    # data.json has shared parts plus one view per week; answer about the view on screen
+    views = file.pop("views")
+    key = view if view in views else file.pop("defaultView")
+    file.pop("defaultView", None)
+    d = {**file, **views[key]}
     ready = [m for m in d["models"] if m["folds"][d["mainFold"]]]
     facts = {
+        "view": "case study: a past week replayed, outcome known" if d["mode"] == "case" else "latest week",
         "data_through": d["updated"],
+        "each_model_this_week": [{"model": m["name"], "surge_chance_by_week": m["chance"]} for m in d["modelForecasts"]],
+        "what_happened_next": d["outcome"],
         "unit": "flu visits per 1,000 outpatient doctor visits (ILI+ x 10)",
         "surge_line": d["lines"]["surge"],
         "season_start_line": d["lines"]["season"],
@@ -99,7 +107,7 @@ Answer rules:
 - You may suggest practical actions, but do not give individual medical advice."""
 
 
-def ask(question: str, history: list[dict]) -> str:
+def ask(question: str, history: list[dict], view: str = "") -> str:
     messages = [{"role": h["role"], "content": str(h["content"])[:2000]}
                 for h in history[-MAX_HISTORY:] if h.get("role") in ("user", "assistant")]
     while messages and messages[0]["role"] != "user":
@@ -112,7 +120,7 @@ def ask(question: str, history: list[dict]) -> str:
         betas=["server-side-fallback-2026-07-01"],
         fallbacks="default",                       # retry declined requests on Anthropic's recommended model
         output_config={"effort": "low"},           # short factual answers
-        system=[{"type": "text", "text": system_prompt(DATA.stat().st_mtime),
+        system=[{"type": "text", "text": system_prompt(DATA.stat().st_mtime, view),
                  "cache_control": {"type": "ephemeral"}}],
         messages=messages,
     )
@@ -141,7 +149,7 @@ class Handler(SimpleHTTPRequestHandler):
             question = str(body.get("question", "")).strip()
             if not question:
                 return self._json(400, {"error": "Ask a question first."})
-            return self._json(200, {"answer": ask(question, body.get("history", []))})
+            return self._json(200, {"answer": ask(question, body.get("history", []), str(body.get("view", "")))})
         except anthropic.AuthenticationError:
             return self._json(503, {"error": "The assistant has no valid API key. Add ANTHROPIC_API_KEY to .env."})
         except anthropic.RateLimitError:

@@ -62,3 +62,8 @@ html {
 input[type="range"] {
   accent-color: var(--accent);
 }
+
+/* Grid columns may shrink below their content, so charts can resize down on narrow screens */
+.grid > * {
+  min-width: 0;
+}

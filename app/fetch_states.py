@@ -3,8 +3,9 @@ Download state-level ILI+ for the dashboard map.
 
 Same measure as the national series: weighted ILI% (ILINet) x clinical-lab
 % flu positive / 100, from the Delphi Epidata API. Recent weeks only, since
-the map shows where flu is now. Some states don't report to ILINet (e.g.
-Florida), so they show as "no data".
+the map shows where flu is now, plus the weeks around the dashboard's case-study
+week (CASE_WEEK in app/insights.py). Some states don't report to ILINet, so they
+show as "no data".
 
     python app/fetch_states.py
 """
@@ -18,6 +19,9 @@ import requests
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
+sys.path.insert(0, str(ROOT / "app"))
+
+from insights import CASE_WEEK                                     # noqa: E402
 from src.evaluate import to_epiweek                                # noqa: E402
 
 OUT = ROOT / "data" / "processed" / "ili_plus_state_weekly.csv"
@@ -38,13 +42,17 @@ def fetch(endpoint: str, fields: list[str], weeks: str) -> pd.DataFrame:
 
 def main() -> None:
     today = pd.Timestamp.today().normalize()
-    weeks = f"{to_epiweek(today - pd.Timedelta(weeks=WEEKS_BACK + 2))}-{to_epiweek(today)}"
+    case = pd.Timestamp(CASE_WEEK)
+    windows = [(today - pd.Timedelta(weeks=WEEKS_BACK + 2), today),
+               (case - pd.Timedelta(weeks=8), case + pd.Timedelta(weeks=4))]
+    weeks = ",".join(f"{to_epiweek(a)}-{to_epiweek(b)}" for a, b in windows)
     ili = fetch("fluview", ["wili"], weeks)
     lab = fetch("fluview_clinical", ["percent_positive"], weeks)
     df = ili.merge(lab, on=["region", "epiweek"], how="inner").dropna()
     df["ili_plus"] = df["wili"] * df["percent_positive"] / 100
     df["state"] = df["region"].str.upper()
-    df = df[["state", "epiweek", "wili", "percent_positive", "ili_plus"]].sort_values(["state", "epiweek"])
+    df = (df[["state", "epiweek", "wili", "percent_positive", "ili_plus"]]
+          .drop_duplicates(["state", "epiweek"]).sort_values(["state", "epiweek"]))
     df.to_csv(OUT, index=False)
     print(f"Wrote {OUT.relative_to(ROOT)}: {df['state'].nunique()} states, "
           f"weeks {df['epiweek'].min()}-{df['epiweek'].max()}")

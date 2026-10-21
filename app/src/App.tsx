@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { fmtDay, loadDashboard, type Dashboard } from "./data";
+import { useEffect, useMemo, useState } from "react";
+import { fmtDay, loadDashboard, toDate, viewOf, type DashboardFile } from "./data";
 import { Hero } from "./components/Hero";
 import { Actions } from "./components/Actions";
 import { Seasons } from "./components/Seasons";
@@ -7,14 +7,38 @@ import { StateMap } from "./components/StateMap";
 import { ModelCheck } from "./components/ModelCheck";
 import { Assistant } from "./components/Assistant";
 
-function Header({ updated }: { updated?: string }) {
+const VIEW_LABEL: Record<string, string> = { case: "Case study", latest: "Latest week" };
+
+function Header({ file, view, onView }: { file: DashboardFile | null; view: string; onView: (v: string) => void }) {
+  const keys = file ? Object.keys(file.views) : [];
   return (
-    <header className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 md:px-8">
+    <header className="mx-auto flex min-h-16 max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-3 md:px-8">
       <span className="text-lg font-extrabold tracking-tight">Flu Surge Outlook</span>
-      {updated && (
-        <span className="text-sm text-muted"><span className="hidden sm:inline">U.S. data through </span>{fmtDay(updated, { month: "short", day: "numeric", year: "numeric" })}</span>
+      {file && keys.length > 1 && (
+        <div role="tablist" aria-label="Which week to show" className="flex gap-1 rounded-full bg-sunken p-1">
+          {keys.map((k) => (
+            <button key={k} role="tab" aria-selected={k === view} onClick={() => onView(k)}
+                    className={`rounded-full px-3.5 py-1.5 text-sm font-semibold whitespace-nowrap transition-colors ${k === view ? "bg-accent text-white" : "text-muted hover:text-ink"}`}>
+              {VIEW_LABEL[k] ?? k}
+              <span className="hidden sm:inline">: {fmtDay(file.views[k].updated, { month: "short", day: "numeric", year: "numeric" })}</span>
+            </button>
+          ))}
+        </div>
       )}
     </header>
+  );
+}
+
+/** Explains what the case-study view is, so nobody mistakes it for this week. */
+function CaseBanner({ updated, crossing }: { updated: string; crossing: string | null }) {
+  return (
+    <div className="bg-sky">
+      <p className="mx-auto max-w-7xl px-4 py-3 text-sm md:px-8">
+        <b>Replaying the week of {fmtDay(updated, { month: "long", day: "numeric", year: "numeric" })}</b>, the decision point
+        {crossing ? ` ${Math.round((toDate(crossing).getTime() - toDate(updated).getTime()) / 6048e5)} weeks before that season's surge (${fmtDay(crossing)})` : ""}. The signal, forecast and recommendations
+        use only what was known that week; "What happened next" shows the outcome.
+      </p>
+    </div>
   );
 }
 
@@ -48,16 +72,19 @@ function About() {
 }
 
 export default function App() {
-  const [data, setData] = useState<Dashboard | null>(null);
+  const [file, setFile] = useState<DashboardFile | null>(null);
+  const [view, setView] = useState("case");
+  const data = useMemo(() => (file ? viewOf(file, view) : null), [file, view]);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    loadDashboard().then(setData).catch((e: Error) => setError(e.message));
+    loadDashboard().then((f) => { setFile(f); setView(f.defaultView); }).catch((e: Error) => setError(e.message));
   }, []);
 
   return (
     <>
-      <Header updated={data?.updated} />
+      <Header file={file} view={view} onView={setView} />
+      {data?.mode === "case" && <CaseBanner updated={data.updated} crossing={data.outcome?.crossing ?? null} />}
       {error && (
         <div className="mx-auto max-w-7xl px-4 py-16 md:px-8">
           <h1 className="text-2xl font-bold">The forecast data didn't load</h1>
@@ -67,10 +94,12 @@ export default function App() {
       {!data && !error && <Skeleton />}
       {data && (
         <main>
-          <Hero data={data} />
-          <Actions data={data} />
-          <StateMap data={data} />
-          <Seasons data={data} />
+          <div key={view}>
+            <Hero data={data} />
+            <Actions data={data} />
+            <StateMap data={data} />
+            <Seasons data={data} />
+          </div>
           <ModelCheck data={data} />
           <About />
           <Assistant data={data} />

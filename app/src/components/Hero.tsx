@@ -1,22 +1,32 @@
 import { useState } from "react";
-import { ArrowCounterClockwise, TrendDown, TrendUp, ArrowRight } from "@phosphor-icons/react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { ArrowCounterClockwise, Eye, TrendDown, TrendUp, ArrowRight } from "@phosphor-icons/react";
 import { fmtDay, LEVELS, pct, type Dashboard } from "../data";
 import { HEADLINES } from "../content";
 import { ForecastChart } from "./ForecastChart";
 import { Gauge } from "./Gauge";
 
 export function Hero({ data }: { data: Dashboard }) {
+  const reduce = useReducedMotion();
   const [replay, setReplay] = useState(0);
+  const [pickId, setPickId] = useState<string | null>(null);      // null = the main (combined) forecast
+  const [reveal, setReveal] = useState(false);
+  const pick = data.modelForecasts.find((m) => m.id === pickId) ?? null;
+  const multi = data.modelForecasts.length > 1;
+  const outcome = data.outcome;
   const { now, forecast, stats } = data;
   const level = LEVELS[now.level];
   const TrendIcon = now.trend === "rising" ? TrendUp : now.trend === "falling" ? TrendDown : ArrowRight;
   const early = stats.vsNormal !== null && stats.vsNormal >= 1.5;
   const chance4 = now.chance?.[now.chance.length - 1];
 
+  const source = now.model === "combined" ? "The five models together put" : "The forecast puts";
   const headline =
-    now.level === 1 && early && chance4 !== undefined
-      ? `Flu season is starting early. The forecast puts a surge in the next 4 weeks at ${pct(chance4)}.`
-      : HEADLINES[now.level];
+    now.level === 1 && chance4 !== undefined && chance4 >= 0.3
+      ? `Flu is rising. ${source} a surge in the next 4 weeks at ${pct(chance4)}, close to Surge watch.`
+      : now.level === 1 && early && chance4 !== undefined
+        ? `Flu season is starting early. ${source} a surge in the next 4 weeks at ${pct(chance4)}.`
+        : HEADLINES[now.level];
 
   const figures = [
     { value: now.value.toFixed(1), unit: "", label: `flu visits per 1,000 doctor visits, ${now.trend}`, icon: TrendIcon },
@@ -63,7 +73,21 @@ export function Hero({ data }: { data: Dashboard }) {
             <ArrowCounterClockwise size={15} weight="bold" aria-hidden /> Replay
           </button>
         </div>
-        <ForecastChart data={data} animKey={`hero-${replay}`} height={330} />
+        {multi && (
+          <div role="radiogroup" aria-label="Which forecast to show" className="mb-2 flex flex-wrap gap-1.5">
+            {[{ id: null, name: "All 5 combined", chance: now.chance }, ...data.modelForecasts].map((m) => {
+              const on = (m.id ?? null) === pickId;
+              const c = m.chance?.[m.chance.length - 1];
+              return (
+                <button key={m.id ?? "combined"} role="radio" aria-checked={on} onClick={() => setPickId(m.id)}
+                        className={`rounded-full border px-3 py-1 text-sm font-medium transition-colors ${on ? "border-accent bg-accent text-white" : "border-line text-muted hover:border-accent hover:text-ink"}`}>
+                  {m.name}{c !== undefined && <b className="ml-1.5 tabular">{pct(c)}</b>}
+                </button>
+              );
+            })}
+          </div>
+        )}
+        <ForecastChart data={data} animKey={`hero-${replay}`} height={330} pick={pick} actual={reveal ? outcome?.actual : null} />
         <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-xs text-muted">
           <span className="flex items-center gap-1.5"><i className="h-[3px] w-5 rounded bg-accent" />This season</span>
           <span className="flex items-center gap-1.5"><i className="h-3 w-5 rounded-sm" style={{ background: "var(--normal)" }} />Normal range</span>
@@ -71,6 +95,25 @@ export function Hero({ data }: { data: Dashboard }) {
           <span className="flex items-center gap-1.5"><i className="h-3 w-5 rounded-sm" style={{ background: "var(--accent-soft)" }} />Forecast range</span>
           <span className="flex items-center gap-1.5"><i className="h-0 w-5 border-t-2 border-dashed border-surge" />Surge line ({data.lines.surge})</span>
         </div>
+        {outcome && (
+          <div className="mt-3 rounded-xl bg-sky px-3 py-2.5 text-sm">
+            {!reveal ? (
+              <button onClick={() => setReveal(true)} className="flex items-center gap-2 font-semibold text-accent">
+                <Eye size={17} weight="bold" aria-hidden /> Show what happened next
+              </button>
+            ) : (
+              <AnimatePresence>
+                <motion.p initial={reduce ? false : { opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}>
+                  <b>What happened next:</b> flu {outcome.crossing ? <>crossed the surge line on <b>{fmtDay(outcome.crossing)}</b></> : "did not cross the surge line"}
+                  {" "}and peaked at <b>{outcome.peakValue} per 1,000</b> on {fmtDay(outcome.peak)}. Circles show the actual next 4 weeks.
+                </motion.p>
+              </AnimatePresence>
+            )}
+          </div>
+        )}
+        {multi && (
+          <p className="mt-2 text-xs text-muted">Chips show each model's chance of a surge within 4 weeks. "All 5 combined" pools their forecasts with equal weight (not tuned) and drives the signal.</p>
+        )}
         {now.model === "naive" && forecast.p50[forecast.p50.length - 1] < now.value && (
           <p className="mt-3 rounded-xl bg-sky px-3 py-2 text-sm text-muted">
             This live view uses the seasonal baseline, which copies last year's later timing, so it likely runs low. It warned earliest in both test seasons; see how all five models compare below.

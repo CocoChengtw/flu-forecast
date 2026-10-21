@@ -20,6 +20,12 @@ SEASON_LINE = config.EARLY_RISE_THRESHOLD
 WATCH_PROB = 0.5                  # chance of crossing within 4 weeks that triggers "Surge watch"
 COVID_SEASON = 2020               # 2020-21: flu nearly absent, left out of comparisons
 
+# Case-study week for the dashboard: the main test season's decision point, 4 weeks
+# before the Dec 14, 2025 crossing, where all five models have forecasts and they
+# disagree most (surge chances 6% to 84%). The outcome is known, so the page can show
+# what happened next.
+CASE_WEEK = "2025-11-16"
+
 # Signal levels, lowest to highest. The web page holds the actions for each.
 LEVELS = ["Quiet", "Elevated", "Surge watch", "Surge"]
 

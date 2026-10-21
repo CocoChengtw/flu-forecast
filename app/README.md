@@ -22,6 +22,16 @@ python app/assistant_server.py     # optional, in a second terminal: AI answers
 The assistant needs `ANTHROPIC_API_KEY` in the repo's `.env`. Without it, the
 suggested questions still get answers written from the page's numbers.
 
+## Two views
+
+- **Case study** (default): the week of `CASE_WEEK` in `insights.py` (Nov 16, 2025), the main
+  test season's decision point 4 weeks before the surge. Every model has a forecast there, the
+  signal uses an equal-weight pool of all five (not tuned), and "Show what happened next"
+  reveals the outcome. Everything else in that view uses only data known that week.
+- **Latest week**: the newest data, where only the seasonal baseline has a forecast.
+
+Run `python app/fetch_states.py` after changing `CASE_WEEK`, so the map has state data for it.
+
 ## Add a model
 
 Save forecasts with `rolling_forecast(...)` as usual. Re-run `export_data.py`

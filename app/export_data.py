@@ -26,7 +26,7 @@ sys.path.insert(0, str(APP))
 
 import insights as ins                                             # noqa: E402
 from src import config                                             # noqa: E402
-from src.evaluate import FORECAST_DIR, forecast_path, load_data, prepare_series  # noqa: E402
+from src.evaluate import FORECAST_DIR, forecast_path, load_data, mmwr_year_start, prepare_series, to_epiweek  # noqa: E402
 from src.compare import crps_samples                               # noqa: E402
 from src.naive import seasonal_naive                               # noqa: E402
 
@@ -216,110 +216,133 @@ def lead_time_from(level: float, seasons: pd.DataFrame, surges: pd.DataFrame) ->
     return weeks
 
 
-def state_snapshot() -> dict | None:
-    """Latest ILI+ per state (within the last 4 weeks) and the change over 3 weeks."""
+def state_snapshot(as_of: pd.Timestamp) -> dict | None:
+    """ILI+ per state as of a week (latest report within 4 weeks of it) and the change
+    over 3 weeks."""
     path = ROOT / "data" / "processed" / "ili_plus_state_weekly.csv"
     if not path.exists():
         return None
     df = pd.read_csv(path)
-    newest = df["epiweek"].max()
+    target = to_epiweek(as_of)
+    df = df[df["epiweek"] <= target]
+    if df.empty:
+        return None
     rows = []
     for state, g in df.groupby("state"):
         g = g.sort_values("epiweek")
-        if newest - g["epiweek"].iloc[-1] > 4:              # stale: treat as no data
+        if (as_of - epiweek_start(g["epiweek"].iloc[-1])).days > 28:   # stale: treat as no data
             continue
         v = g["ili_plus"].iloc[-1]
         prev = g["ili_plus"].iloc[-4] if len(g) >= 4 else np.nan
         rows.append({"state": state, "epiweek": int(g["epiweek"].iloc[-1]),
                      "v": r(v * ins.PER_1000), "change": None if pd.isna(prev) else r((v - prev) * ins.PER_1000)})
-    return {"epiweek": int(newest), "states": rows}
+    return {"epiweek": int(target), "states": rows} if rows else None
 
 
-def main() -> None:
-    history = load_data()["ili_plus"]
-    model_id, origin, paths = live_forecast(history)
-    current = float(history.loc[origin])
+def epiweek_start(ew: int) -> pd.Timestamp:
+    year, week = divmod(int(ew), 100)
+    return pd.Timestamp(mmwr_year_start(year)) + pd.Timedelta(weeks=week - 1)
+
+
+def build_view(mode: str, history: pd.Series, origin: pd.Timestamp, paths: np.ndarray,
+               model_id: str, per_model: dict[str, np.ndarray]) -> dict:
+    """Everything the top of the page shows for one week, using only what was known
+    that week. For the case study, `actual` adds what happened next."""
+    known = history.loc[:origin]
+    current = float(known.iloc[-1])
     probs = ins.crossing_probs(paths, current, ins.SURGE_LINE)
     level = ins.signal_level(current, probs)
 
-    seasons = ins.by_season(history)
-    surges = ins.surge_history(history)
+    seasons = ins.by_season(known)
+    surges = ins.surge_history(known)          # complete seasons before this week only
     this_season = ins.season_of(origin)
     crossed = surges.dropna(subset=["start"])
     typical = ins.season_start(this_season) + pd.Timedelta(weeks=int(crossed["start_week"].median()))
+    earliest = ins.season_start(this_season) + pd.Timedelta(weeks=int(crossed["start_week"].min()))
 
-    recent = history.loc[origin - pd.Timedelta(weeks=20):origin]
+    recent = known.loc[origin - pd.Timedelta(weeks=20):]
     fc_dates = [origin + pd.Timedelta(weeks=k) for k in range(1, HORIZON + 1)]
     b = ins.bands(paths)
 
     # Numbers behind the recommendations: all from the forecast or past seasons
     lead = lead_time_from(max(current, ins.SEASON_LINE), seasons, surges)
+    raw = pd.read_csv(ROOT / "data" / "processed" / "ili_plus_weekly.csv", parse_dates=["week_start"])
+    pos = raw[raw["region"] == config.REGION].set_index("week_start")["pct_positive"]
+    peak_pos = [pos.get(p) for p in surges["peak"] if p in pos.index]
+    states = state_snapshot(origin)
+    risers = sorted([st for st in (states or {}).get("states", []) if st["change"] is not None],
+                    key=lambda st: st["change"], reverse=True)
+    lag = int((crossed["peak_week"] - crossed["start_week"]).median())
+    layers = season_layers(seasons, list(recent.index) + fc_dates, this_season)
+    normal_now = next((l["mid"] for l in layers if l["date"] == day(origin)), None)
     stats = {
         "medianPeak": r(surges["peak_per_1000"].median(), 1),
         "maxPeak": r(surges["peak_per_1000"].max(), 1),
         "medianWeeksAbove": int(crossed["weeks_above"].median()),
-        "lagToPeak": int((crossed["peak_week"] - crossed["start_week"]).median()),
+        "lagToPeak": lag,
         "weeksToTypical": max(int((typical - origin).days // 7), 0),
-        "earliestCrossing": day(ins.season_start(this_season) + pd.Timedelta(weeks=int(crossed["start_week"].min()))),
+        "earliestCrossing": day(earliest),
         "leadMedian": int(np.median(lead)) if lead else None,
         "leadMin": min(lead) if lead else None,
         "leadMax": max(lead) if lead else None,
         "high4": b["p95"][-1],
         "mid4": b["p50"][-1],
-        "weeksAboveSoFar": int((history.loc[ins.season_start(this_season):origin] > ins.SURGE_LINE).sum()),
+        "weeksAboveSoFar": int((known.loc[ins.season_start(this_season):] > ins.SURGE_LINE).sum()),
         "seasonsCrossed": len(crossed),
         "seasonsTotal": len(surges),
-    }
-    # Audience-specific numbers: test positivity (clinics), peak timing (hospitals),
-    # state spread (public health), odds per visit (individuals)
-    raw = pd.read_csv(ROOT / "data" / "processed" / "ili_plus_weekly.csv", parse_dates=["week_start"])
-    pos = raw[raw["region"] == config.REGION].set_index("week_start")["pct_positive"]
-    peak_pos = [pos.get(p) for p in surges["peak"] if p in pos.index]
-    states = state_snapshot()
-    nat_now = current * ins.PER_1000
-    risers = sorted([st for st in (states or {}).get("states", []) if st["change"] is not None],
-                    key=lambda st: st["change"], reverse=True)
-    earliest = ins.season_start(this_season) + pd.Timedelta(weeks=int(crossed["start_week"].min()))
-    stats.update({
         "posNow": r(pos.loc[origin], 1),
         "posPeak": r(np.median(peak_pos), 0),
-        "peakDate": day(typical + pd.Timedelta(weeks=stats["lagToPeak"])),
-        "oneInPeak": ins.one_in(stats["medianPeak"] / ins.PER_1000),
+        "peakDate": day(typical + pd.Timedelta(weeks=lag)),
+        "oneInPeak": ins.one_in(surges["peak_per_1000"].median() / ins.PER_1000),
         "weeksToEarliest": max(int((earliest - origin).days // 7), 0),
-        "statesAbove": sum(st["v"] > nat_now for st in (states or {}).get("states", [])),
+        "statesAbove": sum(st["v"] > current * ins.PER_1000 for st in (states or {}).get("states", [])),
         "statesTotal": len((states or {}).get("states", [])),
         "topRiser": risers[0] if risers else None,
-    })
-    layers = season_layers(seasons, list(recent.index) + fc_dates, this_season)
-    normal_now = next(l["mid"] for l in layers if l["date"] == day(origin))
-    stats["normalNow"] = normal_now
-    stats["vsNormal"] = r(current * ins.PER_1000 / normal_now, 1) if normal_now else None
-    data = {
+        "normalNow": normal_now,
+        "vsNormal": r(current * ins.PER_1000 / normal_now, 1) if normal_now else None,
+    }
+
+    after = history.loc[origin + pd.Timedelta(weeks=1):origin + pd.Timedelta(weeks=HORIZON)]
+    crossing = None
+    if mode == "case":
+        later = history.loc[origin:]
+        above = (later > ins.SURGE_LINE).to_numpy()
+        crossing = next((later.index[i] for i in range(len(later) - 1) if above[i] and above[i + 1]), None)
+        season_rest = history.loc[origin:ins.season_start(this_season + 1)]
+    names = {m["id"]: m["name"] for m in MODELS}
+    return {
+        "mode": mode,
         "updated": day(origin),
-        "lines": {"surge": r(ins.SURGE_LINE * ins.PER_1000, 2),
-                  "season": r(ins.SEASON_LINE * ins.PER_1000, 2)},
         "now": {
             "value": r(current * ins.PER_1000, 2),
             "oneIn": ins.one_in(current),
-            "trend": ins.trend_word(history.loc[:origin]),
+            "trend": ins.trend_word(known),
             "level": level,
             "levelName": ins.LEVELS[level],
             "chance": None if probs is None else [r(p) for p in probs],
             "model": model_id,
         },
         "recent": [{"date": day(d), "v": r(v * ins.PER_1000)} for d, v in recent.items()],
-        # Weekly values covering every test season, for the backtest replay
-        "weekly": [{"date": day(d), "v": r(v * ins.PER_1000)}
-                   for d, v in history.loc[pd.Timestamp(min(f[0] for f in config.TEST_FOLDS.values()))
-                                         - pd.Timedelta(weeks=12):].items()],
         "forecast": {"dates": [day(d) for d in fc_dates], **b},
+        "modelForecasts": [
+            {"id": mid, "name": names[mid], **ins.bands(mp),
+             "chance": (lambda pr: None if pr is None else [r(x) for x in pr])(
+                 ins.crossing_probs(mp, current, ins.SURGE_LINE))}
+            for mid, mp in per_model.items()
+        ],
+        "outcome": None if mode != "case" else {
+            "actual": [r(v * ins.PER_1000) for v in after],
+            "crossing": day(crossing) if crossing is not None else None,
+            "peak": day(season_rest.idxmax()),
+            "peakValue": r(season_rest.max() * ins.PER_1000, 1),
+        },
         "layers": layers,
         "stats": stats,
         "states": states,
         "seasons": [
-            {"season": int(s), "label": ins.season_label(s),
+            {"season": int(sn), "label": ins.season_label(sn),
              "points": [[int(w), r(v)] for w, v in zip(g["week"], g["per_1000"]) if w <= 34]}
-            for s, g in seasons.groupby("season") if s != ins.COVID_SEASON
+            for sn, g in seasons.groupby("season") if sn != ins.COVID_SEASON
         ],
         "currentSeason": this_season,
         "surges": [
@@ -333,13 +356,49 @@ def main() -> None:
             for row in surges.itertuples()
         ],
         "typicalCrossing": day(typical),
-        "models": [model_entry(m, history, origin, paths) for m in MODELS],
-        "mainFold": config.MAIN_FOLD,
+    }
+
+
+def combine(per_model: dict[str, np.ndarray]) -> np.ndarray:
+    """Equal-weight pool of every model's paths (untuned; weights not fitted)."""
+    share = config.N_PATHS // len(per_model)
+    return np.vstack([p[:share] for p in per_model.values()])
+
+
+def main() -> None:
+    history = load_data()["ili_plus"]
+
+    # Latest week: only the seasonal baseline (or a saved live forecast) exists
+    live_id, latest, live_paths = live_forecast(history)
+    latest_view = build_view("latest", history, latest, live_paths, live_id, {live_id: live_paths})
+
+    # Case study: the week of the main test season where every model forecast and the
+    # outcome is known (see CASE_WEEK in insights.py)
+    case = pd.Timestamp(ins.CASE_WEEK)
+    fold = config.MAIN_FOLD
+    saved = {m["id"]: real_paths(m["id"], fold) for m in MODELS}
+    per_model = {mid: p[case] for mid, p in saved.items() if p and case in p}
+    case_view = build_view("case", history, case, combine(per_model), "combined", per_model) \
+        if len(per_model) == len(MODELS) else None
+
+    data = {
+        "lines": {"surge": r(ins.SURGE_LINE * ins.PER_1000, 2),
+                  "season": r(ins.SEASON_LINE * ins.PER_1000, 2)},
+        # Weekly values covering every test season, for the backtest replay
+        "weekly": [{"date": day(d), "v": r(v * ins.PER_1000)}
+                   for d, v in history.loc[pd.Timestamp(min(f[0] for f in config.TEST_FOLDS.values()))
+                                         - pd.Timedelta(weeks=12):].items()],
+        "models": [model_entry(m, history, latest, live_paths) for m in MODELS],
+        "mainFold": fold,
+        "views": {"case": case_view, "latest": latest_view} if case_view else {"latest": latest_view},
+        "defaultView": "case" if case_view else "latest",
     }
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(data, separators=(",", ":")))
-    print(f"Wrote {OUT.relative_to(ROOT)} ({OUT.stat().st_size / 1024:.0f} KB), "
-          f"data through {data['updated']}, level: {data['now']['levelName']}")
+    for name, v in data["views"].items():
+        print(f"{name}: week of {v['updated']}, level {v['now']['levelName']}, "
+              f"surge chance {v['now']['chance'][-1] if v['now']['chance'] else 'above'}")
+    print(f"Wrote {OUT.relative_to(ROOT)} ({OUT.stat().st_size / 1024:.0f} KB)")
 
 
 if __name__ == "__main__":
