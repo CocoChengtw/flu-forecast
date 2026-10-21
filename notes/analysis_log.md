@@ -80,13 +80,14 @@ Two thresholds, both locked from pre-test data before looking at 2025–26 resul
 | Model | CRPS 2025–26 | CRPS 2024–25 | MAE 2025–26 | MAE 2024–25 |
 |---|---|---|---|---|
 | Naive | 0.253 | 0.275 | 0.355 | 0.319 |
-| ETS | 0.226 | 0.180 | 0.289 | 0.246 |
-| **ARIMA** | 0.186 | **0.161** | 0.237 | **0.213** |
-| Prophet | **0.150** | 0.286 | **0.219** | 0.391 |
+| ETS | 0.227 | 0.181 | 0.289 | 0.248 |
+| **ARIMA** | 0.184 | **0.160** | 0.234 | **0.211** |
+| Prophet | **0.150** | 0.285 | **0.219** | 0.391 |
 
 (averaged over horizons 1–4; CRPS scores the whole forecast distribution, lower is better)
 
-- **ARIMA is the most consistent:** 26–41% lower CRPS than naive in both folds.
+- **Reproducibility:** ETS fits now converge at every origin (the default cap of 15,000 likelihood evaluations stopped them early), and simulations are seeded so reruns give identical paths on statsmodels 0.14 and 0.15 (`tests/test_classical.py`). Rerunning moved the metrics by at most 0.003 and changed no rankings.
+- **ARIMA is the most consistent:** 27–42% lower CRPS than naive in both folds.
 - **ETS and ARIMA are excellent 1 week ahead** (CRPS 0.07–0.10 vs. naive 0.25), but error grows with horizon. At 4 weeks they extrapolate the winter rise through the peak and overshoot afterwards (ETS 4-week median up to ~7 vs. observed ~1).
 - **Prophet's rank flips:** best in 2025–26, worst in 2024–25. It forecasts a smooth seasonal average and underestimates every peak (median ~0.7 vs. observed 2.6). This is exactly why we test on two folds.
 
