@@ -5,9 +5,12 @@ plotly
 statsmodels
 statsforecast
 prophet
+torch
+chronos-forecasting>=2.0   # Chronos (amazon/chronos-t5-mini), src/chronos_model.py
 anthropic          # 或 openai，看你們用哪個 LLM
 python-dotenv
 streamlit
 requests
 jupyter
 nbstripout
+pytest

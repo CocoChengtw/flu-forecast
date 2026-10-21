@@ -10,3 +10,8 @@ Reasons behind these decisions are in `notes/analysis_log.md`.
 - `diagnostics.py`: zero share, coverage, interval width, MAE for any model.
 - Added a second test fold (2024–25) to `config.TEST_FOLDS`; `rolling_forecast(..., fold=...)`. Naive MAE 0.355 (2025–26) / 0.319 (2024–25).
 - Seasonal-window sensitivity (±2/4/6/8/all weeks) on both folds; kept ±4.
+
+### Oct 19
+- `classical.py`: ETS, ARIMA (Fourier terms, order by AIC on pre-fold data), Prophet; all on log scale, 500 paths, both folds (~2 min total).
+- `compare.py`: MAE, RMSE, CRPS, 90% coverage by model/fold/horizon → `results/metrics.csv`, `results/metrics_summary.csv`; figures `model_error_by_horizon.png`, `forecast_vs_actual.png`. Picks up new models (e.g. Chronos) automatically.
+- Result: ARIMA most consistent (CRPS −26% / −41% vs. naive); Prophet's rank flips between folds.
