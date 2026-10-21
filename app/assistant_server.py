@@ -64,7 +64,10 @@ def system_prompt(data_mtime: float) -> str:
         "states_now": (d.get("states") or {}).get("states"),
         "models_with_results": [{"name": m["name"], "kind": m["kind"],
                                  "avg_miss_by_weeks_ahead": m["folds"][d["mainFold"]]["mae"],
-                                 "surge_call_brier": m["folds"][d["mainFold"]]["brier"]} for m in ready],
+                                 "surge_call_brier": m["folds"][d["mainFold"]]["brier"],
+                                 "crps": m["folds"][d["mainFold"]]["crps"],
+                                 "coverage_90": m["folds"][d["mainFold"]]["coverage"],
+                                 "warning_weeks": m["folds"][d["mainFold"]]["warningWeeks"]} for m in ready],
         "models_pending": [m["name"] for m in d["models"] if m not in ready],
     }
     return f"""You explain a U.S. flu early-warning dashboard to hospital managers, public-health staff,
@@ -78,7 +81,9 @@ How the dashboard works:
 - The surge line is the 75th percentile of in-season weeks over the last 3 seasons.
 - Forecasts are 500 simulated paths per week; "likely range" is the 5th to 95th percentile.
 - Today's forecast comes from the seasonal baseline (same week last year plus past misses), which
-  can lag a season that starts earlier than last year. Statistical and AI models are being added.
+  can lag a season that starts earlier than last year. ETS, ARIMA, Prophet and Chronos have backtest
+  results (models_with_results): the most accurate models follow momentum and warn late, while the
+  seasonal baseline and Prophet warn of surges weeks earlier. Chronos's ranges are too narrow.
 - 2020-21 is excluded because flu nearly disappeared during COVID.
 - season_stats: vsNormal = this week vs the median of past seasons at the same week; leadMin/leadMax =
   weeks from today's level to a surge crossing in past seasons; medianWeeksAbove = typical surge length.

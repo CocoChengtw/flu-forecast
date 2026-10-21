@@ -12,67 +12,82 @@ function SampleTag() {
   );
 }
 
-/** One row per model: the numbers a planner would compare. Bars have no track on purpose. */
+/** One row per model, ranked by CRPS (the team's main score in src/compare.py). Bars have no track on purpose. */
 function Comparison({ models, fold }: { models: Model[]; fold: string }) {
   const reduce = useReducedMotion();
   const base = models.find((m) => m.id === "naive")?.folds[fold];
-  const rows = models.filter((m) => m.folds[fold]);
+  const rows = models.filter((m) => m.folds[fold]?.crps != null)
+    .sort((x, y) => x.folds[fold]!.crps! - y.folds[fold]!.crps!);
   if (!rows.length) return null;
-  const maxMiss = Math.max(...rows.map((m) => m.folds[fold]!.mae[3]));
-  const best = rows.reduce((a, b) => (a.folds[fold]!.mae[3] < b.folds[fold]!.mae[3] ? a : b));
-  const bestSkill = base ? Math.round((1 - best.folds[fold]!.mae[3] / base.mae[3]) * 100) : null;
-  const crossing = rows[0].folds[fold]!.crossing;
+  const f = (m: Model) => m.folds[fold]!;
+  const maxCrps = Math.max(...rows.map((m) => f(m).crps!));
+  const best = rows[0];
+  const maxWarn = Math.max(...rows.map((m) => f(m).warningWeeks));
+  const earliestAll = rows.filter((m) => f(m).warningWeeks === maxWarn);   // ties are common with ~4 events
+  const bestCall = rows.reduce((x, y) => ((f(y).brier ?? 1) < (f(x).brier ?? 1) ? y : x));
+  const skill = (m: Model) => (base ? Math.round((1 - f(m).crps! / base.crps!) * 100) : 0);
+  const crossing = f(rows[0]).crossing;
+
+  const findings: { label: string; model: Model; names?: string; note: string }[] = [
+    { label: "Most accurate overall", model: best, note: `${skill(best)}% better than the baseline` },
+    { label: "Best surge calls", model: bestCall, note: `surge-call score ${f(bestCall).brier?.toFixed(3)}` },
+    { label: "Earliest warning", model: earliestAll[0], names: earliestAll.map((m) => m.name).join(", "),
+      note: maxWarn ? `${maxWarn} weeks before the surge` : "No model gave 50% before the surge" },
+  ];
 
   return (
     <div className="mt-14">
-      <h3 className="text-xl font-bold tracking-tight">How the models compare</h3>
-      {bestSkill !== null && best.id !== "naive" && (
-        <p className="mt-1 text-muted">
-          {best.name} misses {bestSkill}% less than the baseline 4 weeks ahead{best.sample ? " in these sample results" : ""}.
-        </p>
-      )}
+      <h3 className="text-xl font-bold tracking-tight">How the models compare, {fold} season</h3>
+      <dl className="mt-5 grid gap-4 sm:grid-cols-3">
+        {findings.map((x) => (
+          <div key={x.label} className="rounded-2xl bg-sky p-4">
+            <dt className="text-sm text-muted">{x.label}</dt>
+            <dd className="mt-1 text-xl font-bold">{x.names ?? x.model.name}{!x.names && x.model.sample && <span className="ml-2 align-middle"><SampleTag /></span>}</dd>
+            <dd className="text-sm text-muted">{x.note}</dd>
+          </div>
+        ))}
+      </dl>
       <div className="mt-6 overflow-x-auto">
         <table className="w-full min-w-[760px] text-left text-sm">
           <thead className="text-muted">
             <tr className="border-b border-line">
-              <th className="py-2 pr-4 font-medium">Model</th>
-              <th className="py-2 pr-4 font-medium">Average miss, 4 weeks ahead</th>
+              <th className="py-2 pr-4 pl-2 font-medium">Model</th>
+              <th className="py-2 pr-4 font-medium">Overall score (CRPS)</th>
               <th className="py-2 pr-4 font-medium">vs. baseline</th>
+              <th className="py-2 pr-4 font-medium">Average miss, 4 weeks ahead</th>
               <th className="py-2 pr-4 font-medium">Surge-call score</th>
               <th className="py-2 pr-4 font-medium">Warning before surge</th>
-              <th className="py-2 pr-4 font-medium">Range hit rate</th>
-              <th className="py-2 font-medium">This week: surge chance</th>
+              <th className="py-2 font-medium">Range hit rate</th>
             </tr>
           </thead>
           <tbody>
             {rows.map((m, i) => {
-              const f = m.folds[fold]!;
-              const skill = base ? Math.round((1 - f.mae[3] / base.mae[3]) * 100) : 0;
-              const chance = m.live?.chance?.[m.live.chance.length - 1];
+              const b = f(m);
+              const sk = skill(m);
               return (
                 <tr key={m.id} className={m.id === best.id ? "bg-sky" : ""}>
                   <td className="py-3 pr-4 pl-2">
                     <span className="font-semibold">{m.name}</span>
+                    <span className="ml-2 text-xs text-muted">{m.kind}</span>
                     {m.sample && <span className="ml-2 align-middle"><SampleTag /></span>}
                   </td>
                   <td className="py-3 pr-4">
                     <div className="flex items-center gap-2">
                       <motion.i className="block h-2.5 rounded-full bg-accent"
-                                style={{ width: `${(f.mae[3] / maxMiss) * 120}px`, originX: 0 }}
+                                style={{ width: `${(b.crps! / maxCrps) * 120}px`, originX: 0 }}
                                 initial={reduce ? false : { scaleX: 0 }} whileInView={{ scaleX: 1 }} viewport={{ once: true }}
                                 transition={{ delay: i * 0.06, duration: 0.5 }} />
-                      <span className="tabular">{f.mae[3].toFixed(1)}</span>
+                      <span className="tabular">{b.crps!.toFixed(2)}</span>
                     </div>
                   </td>
-                  <td className={`py-3 pr-4 font-semibold tabular ${m.id === "naive" ? "text-muted" : skill > 0 ? "text-quiet" : "text-surge"}`}>
-                    {m.id === "naive" ? "Baseline" : `${Math.abs(skill)}% ${skill > 0 ? "smaller" : "larger"}`}
+                  <td className={`py-3 pr-4 font-semibold tabular ${m.id === "naive" ? "text-muted" : sk > 0 ? "text-quiet" : "text-surge"}`}>
+                    {m.id === "naive" ? "Baseline" : `${Math.abs(sk)}% ${sk > 0 ? "better" : "worse"}`}
                   </td>
-                  <td className="py-3 pr-4 tabular">{f.brier?.toFixed(3) ?? "n/a"}</td>
-                  <td className="py-3 pr-4 tabular">{f.warningWeeks ? `${f.warningWeeks} wks` : "None"}</td>
-                  <td className="py-3 pr-4 tabular">{f.coverage !== null ? pct(f.coverage) : "n/a"}</td>
-                  <td className="py-3 tabular">
-                    {chance !== undefined ? pct(chance) : "n/a"}
-                    {m.live && <span className="ml-2 text-muted">({m.live.mid4.toFixed(1)} per 1,000 in 4 wks)</span>}
+                  <td className="py-3 pr-4 tabular">{b.mae[3].toFixed(1)}</td>
+                  <td className={`py-3 pr-4 tabular ${m.id === bestCall.id ? "font-semibold" : ""}`}>{b.brier?.toFixed(3) ?? "n/a"}</td>
+                  <td className={`py-3 pr-4 tabular ${maxWarn && b.warningWeeks === maxWarn ? "font-semibold" : ""}`}>{b.warningWeeks ? `${b.warningWeeks} wks` : "None"}</td>
+                  <td className={`py-3 tabular ${b.coverage !== null && b.coverage < 0.75 ? "font-semibold text-surge" : ""}`}>
+                    {b.coverage !== null ? pct(b.coverage) : "n/a"}
                   </td>
                 </tr>
               );
@@ -81,10 +96,11 @@ function Comparison({ models, fold }: { models: Model[]; fold: string }) {
         </table>
       </div>
       <p className="mt-4 max-w-[85ch] text-sm text-muted">
-        Surge-call score: 0 is perfect, 0.25 is a coin flip. Warning: weeks before the {fold} surge
-        {crossing ? ` (${fmtDay(crossing)})` : ""} that the model first gave a 50% chance. Range hit rate: how often
-        the actual value fell inside the 90% range (target 90%).
-        {rows.some((m) => m.sample) && " Sample rows are illustrative until the team's models are saved on Tue 10/20. The signal and recommendations above use only real results."}
+        Overall score (CRPS) rates the whole forecast range, per 1,000 visits; lower is better. Surge-call score: 0 is
+        perfect, 0.25 is a coin flip. Warning: weeks before the {fold} surge{crossing ? ` (${fmtDay(crossing)})` : ""} that
+        the model first gave a 50% chance. Range hit rate: how often the actual value fell inside the 90% range
+        (target 90%). Each season has about 4 surge events, so rankings can flip between seasons; compare both.
+        {rows.some((m) => m.sample) && " Sample rows are illustrative until the team's results are saved."}
       </p>
     </div>
   );

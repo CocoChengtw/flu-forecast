@@ -15,6 +15,7 @@ export type Backtest = {
   mae: number[];                 // average miss per 1,000, by weeks ahead
   brier: number | null;          // surge-call score, 0 is perfect
   coverage: number | null;       // share of actual values inside the 90% range
+  crps: number | null;           // CRPS per 1,000, averaged over horizons 1-4 (src/compare.py)
   warningWeeks: number;          // weeks of warning before the season's surge crossing
   crossing: string | null;
 };

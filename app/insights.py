@@ -12,6 +12,7 @@ import pandas as pd
 
 from src import config
 from src.evaluate import mmwr_year_start
+from src.probabilities import crossing_probability
 
 PER_1000 = 10                     # raw ILI+ -> flu visits per 1,000 visits
 SURGE_LINE = config.HIGH_THRESHOLD
@@ -78,13 +79,12 @@ def surge_history(history: pd.Series) -> pd.DataFrame:
 
 # 2. Forecast summaries
 def crossing_probs(paths: np.ndarray, current: float, threshold: float) -> list[float] | None:
-    """P(any of the next k weeks is above threshold), k = 1..horizon.
-    None when already above (the README's event rule).
-    TODO: replace with src/probabilities.py once it exists."""
+    """P(any of the next k weeks is above threshold), k = 1..horizon, using the team's
+    src/probabilities.py so the page matches the reported Brier scores (k = horizon is
+    exactly its crossing_probability). None when already above (the event rule)."""
     if current > threshold:
         return None
-    above = paths > threshold
-    return [float(above[:, :k].any(axis=1).mean()) for k in range(1, paths.shape[1] + 1)]
+    return [float(crossing_probability(paths[:, :k], threshold)) for k in range(1, paths.shape[1] + 1)]
 
 
 def bands(paths: np.ndarray) -> dict[str, list[float]]:

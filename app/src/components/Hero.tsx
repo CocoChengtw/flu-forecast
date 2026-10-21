@@ -73,7 +73,7 @@ export function Hero({ data }: { data: Dashboard }) {
         </div>
         {now.model === "naive" && forecast.p50[forecast.p50.length - 1] < now.value && (
           <p className="mt-3 rounded-xl bg-sky px-3 py-2 text-sm text-muted">
-            Today's forecast copies last year's timing, which started later, so it likely runs low. Statistical and AI forecasts arrive Tue 10/20.
+            This live view uses the seasonal baseline, which copies last year's later timing, so it likely runs low. It warned earliest in both test seasons; see how all five models compare below.
           </p>
         )}
       </div>

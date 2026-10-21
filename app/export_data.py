@@ -27,6 +27,7 @@ sys.path.insert(0, str(APP))
 import insights as ins                                             # noqa: E402
 from src import config                                             # noqa: E402
 from src.evaluate import FORECAST_DIR, forecast_path, load_data, prepare_series  # noqa: E402
+from src.compare import crps_samples                               # noqa: E402
 from src.naive import seasonal_naive                               # noqa: E402
 
 OUT = APP / "public" / "data.json"
@@ -74,7 +75,7 @@ def live_forecast(history: pd.Series) -> tuple[str, pd.Timestamp, np.ndarray]:
 # Sample results for models whose real results aren't saved yet, so the page can
 # show what they will add. They live only in data.json (flagged "sample": true and
 # labeled on the page), never in results/forecasts/. Turn off once real results exist.
-SAMPLE_MODELS = True
+SAMPLE_MODELS = False
 # (how much of the true future each sample model "sees", base spread, spread growth
 # per week ahead, how much recent momentum it carries forward)
 SAMPLE_SPECS = {
@@ -140,7 +141,7 @@ def first_crossing(history: pd.Series, start, end) -> pd.Timestamp | None:
 def summarize(paths_by_origin: dict, fold: str, history: pd.Series) -> dict:
     """Every forecast in a test season with what happened, plus accuracy, surge-call
     score, interval coverage and how many weeks of warning the model gave."""
-    origins, briers, errors, hits = [], [], [[] for _ in range(HORIZON)], []
+    origins, briers, errors, hits, crps = [], [], [[] for _ in range(HORIZON)], [], []
     crossing = first_crossing(history, *config.TEST_FOLDS[fold])
     warning = 0
     for origin, paths in sorted(paths_by_origin.items()):
@@ -151,6 +152,7 @@ def summarize(paths_by_origin: dict, fold: str, history: pd.Series) -> dict:
         b = ins.bands(paths)
         for k, v in enumerate(after.to_numpy()):
             errors[k].append(abs(np.median(paths[:, k]) - v))
+            crps.append(crps_samples(paths[:, k], v))         # same CRPS as src/compare.py
             hits.append(b["p5"][k] <= v * ins.PER_1000 <= b["p95"][k])
         if probs is not None:
             briers.append((probs[-1] - crossed) ** 2)
@@ -163,6 +165,7 @@ def summarize(paths_by_origin: dict, fold: str, history: pd.Series) -> dict:
         "mae": [r(np.mean(e) * ins.PER_1000) for e in errors],
         "brier": r(np.mean(briers)) if briers else None,
         "coverage": r(np.mean(hits), 2) if hits else None,
+        "crps": r(np.mean(crps) * ins.PER_1000) if crps else None,
         "warningWeeks": warning,
         "crossing": day(crossing) if crossing is not None else None,
     }
