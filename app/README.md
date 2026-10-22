@@ -1,5 +1,7 @@
 # Flu Surge Outlook (dashboard)
 
+**Live: [flu-surge-outlook.netlify.app](https://flu-surge-outlook.netlify.app)**
+
 A static web page (React + Vite) that reads one data file, plus a small Python
 service for the AI assistant.
 
