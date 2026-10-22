@@ -2,11 +2,23 @@
 
 **AI vs. Statistical Forecasts of Flu Season, Deployed as a Live Dashboard**
 
+**▶ Live demo: [flu-surge-outlook.netlify.app](https://flu-surge-outlook.netlify.app)** · **Slides: [seeing-the-surge-coming.pdf](slides/seeing-the-surge-coming.pdf)**
+
 Group final project for Time Series Analysis and Forecasting (UCLA Anderson, Dr. William Yu).
+
+## Dashboard
+
+The [Flu Surge Outlook](https://flu-surge-outlook.netlify.app) shows the current U.S. flu activity level, each model’s chance of a surge in the next four weeks, and recommended actions for different audiences.
+
+How to use it:
+
+- Use the toggle at the top to switch between the **case study** (the week of Nov 16, 2025, four weeks before that season’s surge) and the **latest week** of data.
+- Click a model chip (e.g. ARIMA, Chronos, or "All 5 combined") to see that model’s forecast and surge chance; in the case study, **Show what happened next** reveals the outcome.
+- Pick an audience tab under **Recommended now** for suggested actions, or click **Ask about this forecast** to ask the AI assistant a question in plain language.
 
 ## Goal
 
-Give a local health department or hospital operations team early warning of the flu season, so they can decide when to add staff and beds, push vaccination messaging, and alert providers.
+Give national or regional public-health planners early warning of high flu activity, so they can decide when to scale up staffing, supplies and public messaging.
 
 We forecast weekly U.S. **ILI+** 1–4 weeks ahead and compare classical statistical models with an AI forecasting model. The best results are shown in a web dashboard with an AI assistant that explains the forecast in plain language.
 
@@ -25,13 +37,14 @@ The forecasts are framed around timing decisions, not just point estimates:
 
 1. **Threshold probability (priority):** the chance ILI+ goes above a threshold within the next 1–4 weeks. If ILI+ is already above it, we show "Above threshold" instead, since the probability would stay near 100% for weeks.
 2. **Onset week:** the first of two consecutive weeks above the early-rise threshold.
-3. **Peak timing:** the chance the season peaks within the next 4 weeks.
+
+Peak timing was dropped as out of scope.
 
 Two thresholds, both locked from pre-test data before looking at 2025–26 results:
 
 | Threshold | Value | Role |
 |---|---|---|
-| **High activity** (`HIGH_THRESHOLD`) | 0.694 | **Main output:** surge decisions (staffing, beds) |
+| **High activity** (`HIGH_THRESHOLD`) | 0.694 | **Main output:** early warning of high flu activity |
 | **Early rise** (`EARLY_RISE_THRESHOLD`) | 0.028 | Secondary: activity rising above the summer floor |
 
 ## Data
@@ -74,16 +87,16 @@ All shared settings (dates, horizons, threshold, number of paths, random seed) l
 **Models**
 
 - Classical: seasonal naive (baseline), ETS, ARIMA with Fourier terms, Prophet
-- AI: Chronos (a time-series foundation model)
-- Optional: a small ChatGPT/Claude comparison on 3–5 origins
+- AI: Chronos (`amazon/chronos-t5-mini`, a pretrained time-series model, used zero-shot)
+- The optional ChatGPT/Claude forecast comparison was not pursued.
 
 **Metrics**
 
 - Point forecasts (path median): MAE, RMSE
-- Threshold probabilities: Brier score
-- Timing: error in onset week and peak week, in weeks
+- Whole forecast distribution: CRPS and 90% interval coverage
+- Threshold probabilities: Brier score. The high-activity event is the main metric; early rise and onset have only 4–6 scorable weeks per season, so models are not ranked on them.
 
-**Wastewater (stretch goal):** a lead-time analysis of wastewater vs. influenza-A ILI+ only. The wastewater history is too short to use as a model input. Use `ili_plus_a_weekly.csv` and the `nwss_flu_a_*_filtered.csv` files for the comparison/map; original aggregates remain available for audit. The coverage screen uses each geography's prior-eight-week median site count, with a 50% cutoff. See [wastewater preparation and map guidance](notes/wastewater_stretch.md) for limitations, missing-week handling, and reproduction commands.
+**Wastewater (stretch goal):** a lead-time analysis of wastewater vs. influenza-A ILI+ only. The wastewater history is too short to use as a model input. Use `ili_plus_a_weekly.csv` and the `nwss_flu_a_*_filtered.csv` files for the comparison/map; original aggregates remain available for audit. The coverage screen uses each geography's prior-eight-week median site count, with a 50% cutoff. See [wastewater preparation and map guidance](notes/wastewater_stretch.md) for limitations, missing-week handling, and reproduction commands. Finding: wastewater tracks flu-A ILI+ closely (same-week correlation 0.90–0.95) but gave no consistent early warning within ±4 weeks ([details](notes/wastewater_lead_exploration.md)).
 
 ### Shared forecast output format
 
@@ -99,6 +112,18 @@ Every model saves `results/forecasts/<model>.csv` with these columns:
 | `value` | forecast ILI+ |
 
 Plug a model into the rolling-origin framework in `src/evaluate.py` and it writes this file for you. Run both folds: `rolling_forecast(model_fn, "<model>")` and `rolling_forecast(model_fn, "<model>", fold="2024-25")`; the second fold is saved in `results/forecasts/fold_2024-25/`. Run `python -m src.diagnostics <model>` to check a model's intervals before trusting its probabilities.
+
+## Results
+
+Full tables: `results/metrics_summary.csv` (accuracy) and `results/probabilities/` (threshold probabilities); reasoning in `notes/analysis_log.md`.
+
+- **ARIMA was the most consistent model:** 27–42% lower CRPS than the naive baseline in both test seasons.
+- **Chronos (AI) was competitive but overconfident:** its 90% intervals held the actual value only about 60% of the time.
+- **Surge probabilities are fragile:** only Prophet beat the naive baseline on the high-activity Brier score in both seasons, with just four threshold crossings per season.
+
+## AI tools statement
+
+We used AI tools in two ways: inside the analysis and product, and to help build them. In the analysis, Chronos (Amazon’s pretrained time-series foundation model, chronos-t5-mini, used zero-shot) was one of our five forecasting models, evaluated under the same rolling-origin design as the statistical models; it was competitive on accuracy but overconfident, with 90% intervals covering the actual value only about 60% of the time. In the product, the dashboard’s assistant uses Anthropic’s Claude to answer questions in plain language from the page’s own numbers, falling back to pre-written answers when the model is unavailable. For development, several team members used Claude Code, an AI coding assistant, to research data sources, build the dashboard, and draft documentation. All AI-assisted work went through pull-request review, automated tests and independent reruns by teammates, which also caught errors: for example, two incorrect claims in a draft were corrected after we checked them against the results.
 
 ## Repo structure
 
@@ -116,9 +141,12 @@ flu-forecast/
 ├── notebooks/          exploration notebooks
 ├── results/
 │   ├── forecasts/      one CSV per model, shared format above (fold_2024-25/ for the second fold)
+│   ├── probabilities/  threshold probabilities per model
 │   └── figures/
 ├── notes/              decision log for the methods and limitations slides
-├── app/                dashboard (React page + Python assistant), see app/README.md
+├── tests/              python -m pytest tests
+├── app/                Flu Surge Outlook dashboard (React page + AI assistant, deployed on Netlify), see app/README.md
+├── slides/             final presentation deck (PDF)
 ├── forecasting_project_handbook.md   course concepts, from the lecture decks
 ├── requirements.txt
 ├── .env.example
@@ -141,7 +169,7 @@ cp .env.example .env
 
 On Windows, activate the environment with `.venv\Scripts\activate` instead.
 
-Only the AI assistant and the optional LLM comparison need an API key in `.env`. Everyone else can leave it empty.
+Only the dashboard's AI assistant needs an API key in `.env`. Everyone else can leave it empty.
 
 ## Daily workflow
 
@@ -178,7 +206,7 @@ Then open a Pull Request on GitHub to merge into `main`.
 |---|---|
 | A | Data, EDA, threshold calculation, wastewater (stretch) |
 | B | Evaluation framework, preprocessing, classical models |
-| C | Chronos, probability outputs, optional LLM comparison |
+| C | Chronos, probability outputs |
 | D | Dashboard, AI assistant, deployment |
 | E | Slides, storytelling, written deliverables (incl. product description and AI-tools statement) |
 
